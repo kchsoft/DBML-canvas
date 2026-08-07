@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "nodes": {
+    "public.member": { "x": 40, "y": 160 },
+    "public.daily_question": { "x": 440, "y": 40 },
+    "public.answer": { "x": 840, "y": 40 },
+    "public.ai_report": { "x": 440, "y": 440 }
+  },
+  "viewport": { "x": 20, "y": 20, "zoom": 0.9 }
+}

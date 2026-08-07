@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+out/
+*.tsbuildinfo
+.idea/
+.vscode-test/
+*.iml
+.DS_Store
+.gradle/
+apps/intellij-plugin/.intellijPlatform/
+apps/vscode-extension/media/

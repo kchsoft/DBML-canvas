@@ -1,0 +1,19 @@
+<idea-plugin>
+    <id>dev.dbmlcanvas</id>
+    <name>DBML Canvas</name>
+    <vendor email="studiothinkgrow@gmail.com">DBML Canvas</vendor>
+
+    <description><![CDATA[
+      Render DBML files as draggable ER diagrams and store layout data beside the DBML file.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.jcef</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+                id="DBML Canvas"
+                anchor="right"
+                factoryClass="dev.dbmlcanvas.intellij.DbmlCanvasToolWindowFactory" />
+    </extensions>
+</idea-plugin>

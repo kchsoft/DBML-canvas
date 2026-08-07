@@ -1,0 +1,37 @@
+{
+  "name": "dbml-canvas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Git-native DBML ERD renderer with portable layout files for web, VS Code, and JetBrains IDEs.",
+  "license": "SEE LICENSE IN EULA.md",
+  "workspaces": [
+    "packages/*",
+    "apps/web-sandbox",
+    "apps/host-webview",
+    "apps/vscode-extension"
+  ],
+  "scripts": {
+    "build:core": "npm run build -w @dbml-canvas/core",
+    "build:renderer": "npm run build -w @dbml-canvas/renderer",
+    "build:web": "npm run build -w @dbml-canvas/web-sandbox",
+    "build:webview": "npm run build -w @dbml-canvas/host-webview",
+    "build:vscode-host": "npm run build -w dbml-canvas-vscode",
+    "build": "npm run build:core && npm run build:renderer && npm run build:web && npm run build:webview && npm run build:vscode-host",
+    "dev": "npm run build:core && npm run build:renderer && npm run dev -w @dbml-canvas/web-sandbox",
+    "dev:webview": "npm run build:core && npm run build:renderer && npm run dev -w @dbml-canvas/host-webview",
+    "build:vscode": "npm run build:core && npm run build:renderer && npm run build:webview && npm run build:vscode-host",
+    "typecheck": "npm run build:core && npm run build:renderer && npm run typecheck -w @dbml-canvas/web-sandbox && npm run typecheck -w @dbml-canvas/host-webview && npm run typecheck -w dbml-canvas-vscode",
+    "test": "npm run test:legal && npm run test -w @dbml-canvas/core && npm run test -w @dbml-canvas/renderer && npm run test -w @dbml-canvas/web-sandbox && npm run test -w @dbml-canvas/host-webview",
+    "test:legal": "node --test test/legal-notices.test.mjs",
+    "legal:notices": "node scripts/generate-third-party-notices.mjs THIRD_PARTY_NOTICES.txt",
+    "clean": "node scripts/clean.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3"
+  }
+}

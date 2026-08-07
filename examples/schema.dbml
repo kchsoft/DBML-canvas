@@ -1,0 +1,27 @@
+Project dbml_canvas_demo {
+  database_type: 'PostgreSQL'
+  Note: 'Example schema used by DBML Canvas'
+}
+
+Table member {
+  id bigint [pk, increment]
+  email varchar(255) [not null, unique]
+  created_at timestamp [not null]
+}
+
+Table question {
+  id bigint [pk, increment]
+  member_id bigint [not null]
+  question_date date [not null]
+  prompt text [not null]
+}
+
+Table answer {
+  id bigint [pk, increment]
+  question_id bigint [not null, unique]
+  content text [not null]
+  created_at timestamp [not null]
+}
+
+Ref: question.member_id > member.id
+Ref: answer.question_id - question.id

@@ -1,0 +1,62 @@
+{
+  "name": "dbml-canvas-vscode",
+  "displayName": "DBML Canvas",
+  "description": "Preview DBML as a draggable ERD and save positions beside the schema file.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "local-development",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:dbmlCanvas.openPreview"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "dbml",
+        "aliases": [
+          "DBML",
+          "dbml"
+        ],
+        "extensions": [
+          ".dbml"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "dbmlCanvas.openPreview",
+        "title": "DBML Canvas: Open Preview"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "dbmlCanvas.openPreview",
+          "when": "resourceExtname == .dbml",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "copy-webview": "node scripts/copy-webview.mjs",
+    "build": "npm run copy-webview && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dbml-canvas/core": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/vscode": "^1.102.0"
+  },
+  "type": "module"
+}

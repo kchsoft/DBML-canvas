@@ -1,0 +1,21 @@
+{
+  "name": "@dbml-canvas/web-sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@dbml-canvas/core": "0.1.0",
+    "@dbml-canvas/renderer": "0.1.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "vite": "8.1.5"
+  }
+}
