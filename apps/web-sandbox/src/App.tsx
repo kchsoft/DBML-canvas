@@ -61,9 +61,20 @@ export function App() {
         setSchema(nextSchema);
         setError(undefined);
         setLayout((current) => pruneLayout(current, nextSchema));
-        localStorage.setItem(SOURCE_KEY, source);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [source]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        parser.parse(source, { filepath: 'schema.dbml' });
+        localStorage.setItem(SOURCE_KEY, source);
+      } catch {
+        // Keep the last valid save; don't persist unparseable DBML.
       }
     }, 350);
     return () => window.clearTimeout(timer);
