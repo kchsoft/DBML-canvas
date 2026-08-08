@@ -9,6 +9,11 @@ import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.util.Alarm
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -48,7 +53,7 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
         val panel = JPanel(BorderLayout())
         val browser = JBCefBrowser()
         val query = JBCefJSQuery.create(browser as JBCefBrowserBase)
-        val handler = HostMessageHandler(project, browser)
+        val handler = HostMessageHandler(project, browser, disposable)
 
         Disposer.register(disposable, browser)
         Disposer.register(disposable, query)
@@ -77,6 +82,15 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
                     }
                 }
             },
+        )
+
+        EditorFactory.getInstance().eventMulticaster.addDocumentListener(
+            object : DocumentListener {
+                override fun documentChanged(event: DocumentEvent) {
+                    handler.onDocumentChanged(event.document)
+                }
+            },
+            disposable,
         )
 
         browser.loadHTML(html)
@@ -122,12 +136,24 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
 private class HostMessageHandler(
     private val project: Project,
     private val browser: JBCefBrowser,
+    disposable: com.intellij.openapi.Disposable,
 ) {
     @Volatile
     private var webviewReady = false
 
     @Volatile
     private var currentFile: VirtualFile? = null
+
+    private val refreshAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, disposable)
+
+    fun onDocumentChanged(document: Document) {
+        val file = currentFile ?: return
+        val changedFile = FileDocumentManager.getInstance().getFile(document) ?: return
+        if (changedFile != file) return
+
+        refreshAlarm.cancelAllRequests()
+        refreshAlarm.addRequest({ if (currentFile == file) refresh(file) }, 250)
+    }
 
     fun handle(rawMessage: String) {
         val message = runCatching { JsonParser.parseString(rawMessage).asJsonObject }.getOrNull() ?: return
