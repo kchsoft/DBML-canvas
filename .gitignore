@@ -5,6 +5,7 @@ out/
 *.tsbuildinfo
 .idea/
 .vscode-test/
+.worktrees/
 *.iml
 .DS_Store
 .gradle/
