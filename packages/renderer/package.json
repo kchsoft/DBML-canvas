@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@dbml-canvas/core": "0.1.0",
+    "@tisoap/react-flow-smart-edge": "4.13.1",
     "@xyflow/react": "12.11.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -12,6 +12,8 @@ test('generates notices for shipped runtime dependencies only', async () => {
   assert.match(notices, /Apache-2\.0/);
   assert.match(notices, /Copyright 2019 Holistics Software Pte Ltd\./);
   assert.match(notices, /@xyflow\/react 12\.11\.2/);
+  assert.match(notices, /@tisoap\/react-flow-smart-edge 4\.13\.1/);
+  assert.match(notices, /Custom React Flow Edge that never intersects with other nodes|MIT License/i);
   assert.match(notices, /react 19\.2\.8/);
   assert.doesNotMatch(notices, /lightningcss/);
   assert.doesNotMatch(notices, /did not include a standalone license file/);
