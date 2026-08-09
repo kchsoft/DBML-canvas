@@ -71,6 +71,35 @@ test('falls back locally for returned and thrown smart routing errors', () => {
   assert.match(thrownError.path, /^M/);
 });
 
+test('falls back when smart routing returns an unusable success value', () => {
+  const invalidResults = [
+    {
+      svgPathString: '',
+      edgeCenterX: 5,
+      edgeCenterY: 0,
+      points: [[0, 0], [10, 0]],
+    },
+    {
+      svgPathString: 'M 0,0 L 10,0',
+      edgeCenterX: Number.NaN,
+      edgeCenterY: 0,
+      points: [[0, 0], [10, 0]],
+    },
+    {
+      svgPathString: 'M 0,0 L 10,0',
+      edgeCenterX: 5,
+      edgeCenterY: 0,
+      points: [[0, 0], ['bad', 0]],
+    },
+  ];
+
+  for (const invalid of invalidResults) {
+    const route = resolveFkRoute(params, nodes, 'settled', () => invalid);
+    assert.equal(route.kind, 'adaptive');
+    assert.match(route.path, /^M/);
+  }
+});
+
 test('routes settled paths orthogonally around a table with 16px clearance', () => {
   const route = resolveFkRoute(params, nodes, 'settled');
 

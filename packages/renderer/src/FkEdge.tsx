@@ -69,6 +69,19 @@ export function resolveFkRoute(
       options: SMART_EDGE_OPTIONS,
     });
     if (smart instanceof Error) return adaptive;
+    const hasUsablePoints = Array.isArray(smart.points) && smart.points.every((point) => (
+      Array.isArray(point)
+      && point.length >= 2
+      && Number.isFinite(point[0])
+      && Number.isFinite(point[1])
+    ));
+    if (
+      typeof smart.svgPathString !== 'string'
+      || smart.svgPathString.trim().length === 0
+      || !Number.isFinite(smart.edgeCenterX)
+      || !Number.isFinite(smart.edgeCenterY)
+      || !hasUsablePoints
+    ) return adaptive;
 
     return {
       kind: 'smart',
