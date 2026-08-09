@@ -28,7 +28,8 @@ Not implemented yet:
 - Route editing for relationship lines
 - Multiple named views
 - Multi-file DBML projects
-- Marketplace packaging/signing
+- VS Code Marketplace publishing (packaging works via `npm run package -w dbml-canvas-vscode`; not yet published)
+- IntelliJ Marketplace publishing/signing
 - A polished parser error model across all DBML syntax errors
 
 ## Run the browser sandbox
@@ -64,6 +65,15 @@ The extension writes layout data beside the DBML file:
 schema.dbml
 schema.dbml.layout.json
 ```
+
+To build a distributable `.vsix`:
+
+```bash
+cd apps/vscode-extension
+npm run package
+```
+
+This produces `dbml-canvas-vscode-<version>.vsix`. Publish with `npm run publish` (requires `vsce login thinkgrowstudio` first, using a Marketplace Personal Access Token).
 
 ## IntelliJ plugin
 

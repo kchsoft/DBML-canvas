@@ -10,3 +10,4 @@ out/
 .gradle/
 apps/intellij-plugin/.intellijPlatform/
 apps/vscode-extension/media/
+*.vsix

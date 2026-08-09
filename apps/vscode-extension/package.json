@@ -3,9 +3,14 @@
   "displayName": "DBML Canvas",
   "description": "Preview DBML as a draggable ERD and save positions beside the schema file.",
   "version": "0.1.0",
-  "private": true,
-  "publisher": "local-development",
-  "license": "UNLICENSED",
+  "publisher": "thinkgrowstudio",
+  "license": "SEE LICENSE IN LICENSE",
+  "icon": "icons/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kchsoft/DBML-canvas.git",
+    "directory": "apps/vscode-extension"
+  },
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -48,15 +53,18 @@
   },
   "scripts": {
     "copy-webview": "node scripts/copy-webview.mjs",
-    "build": "npm run copy-webview && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@dbml-canvas/core": "0.1.0"
+    "build": "npm run copy-webview && node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build -w @dbml-canvas/host-webview && npm run build && node --import ./test/register-vscode-mock.mjs --test test/*.test.mjs",
+    "package": "npm run build && node scripts/package.mjs package",
+    "publish": "npm run build && node scripts/package.mjs publish"
   },
   "devDependencies": {
+    "@dbml-canvas/core": "0.1.0",
     "@types/node": "^22.15.0",
-    "@types/vscode": "^1.102.0"
+    "@types/vscode": "^1.102.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.27.7"
   },
   "type": "module"
 }

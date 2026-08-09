@@ -21,7 +21,7 @@
     "dev:webview": "npm run build:core && npm run build:renderer && npm run dev -w @dbml-canvas/host-webview",
     "build:vscode": "npm run build:core && npm run build:renderer && npm run build:webview && npm run build:vscode-host",
     "typecheck": "npm run build:core && npm run build:renderer && npm run typecheck -w @dbml-canvas/web-sandbox && npm run typecheck -w @dbml-canvas/host-webview && npm run typecheck -w dbml-canvas-vscode",
-    "test": "npm run test:legal && npm run test -w @dbml-canvas/core && npm run test -w @dbml-canvas/renderer && npm run test -w @dbml-canvas/web-sandbox && npm run test -w @dbml-canvas/host-webview",
+    "test": "npm run test:legal && npm run test -w @dbml-canvas/core && npm run test -w @dbml-canvas/renderer && npm run test -w @dbml-canvas/web-sandbox && npm run test -w @dbml-canvas/host-webview && npm run test -w dbml-canvas-vscode",
     "test:legal": "node --test test/legal-notices.test.mjs",
     "legal:notices": "node scripts/generate-third-party-notices.mjs THIRD_PARTY_NOTICES.txt",
     "clean": "node scripts/clean.mjs"
