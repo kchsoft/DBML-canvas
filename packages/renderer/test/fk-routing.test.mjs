@@ -71,6 +71,8 @@ test('uses deterministic opposite sides for self references and vertical ties', 
 test('transitions between settled and adaptive routing around a drag', () => {
   assert.equal(transitionFkRoutingMode('settled', 'drag-start'), 'adaptive');
   assert.equal(transitionFkRoutingMode('adaptive', 'drag-stop'), 'settled');
+  assert.equal(transitionFkRoutingMode('adaptive', 'drag-start'), 'adaptive');
+  assert.equal(transitionFkRoutingMode('settled', 'drag-stop'), 'settled');
 });
 
 test('creates an FK edge with geometry-selected handles and preserved semantics', () => {

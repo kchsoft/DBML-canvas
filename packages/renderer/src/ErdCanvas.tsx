@@ -13,7 +13,7 @@ import {
   type OnNodeDrag,
   type OnMove,
 } from '@xyflow/react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   updateNodeLayout,
   updateNodeAnnotation,
@@ -25,8 +25,19 @@ import {
   type NodeAnnotationPatch,
   type SourceRange,
 } from '@dbml-canvas/core';
-import { createFlowEdges, createFlowNodes, type TableFlowNode } from './graph.js';
-import type { FkFlowEdge } from './fk-routing.js';
+import { FkEdge } from './FkEdge.js';
+import {
+  createFlowEdges,
+  createFlowNodes,
+  type TableAnnotationChangeHandler,
+  type TableFlowNode,
+  type TableNoteEditHandler,
+} from './graph.js';
+import {
+  transitionFkRoutingMode,
+  type FkFlowEdge,
+  type FkRoutingMode,
+} from './fk-routing.js';
 import { TableNode } from './TableNode.js';
 import {
   CONTROL_WHEEL_ZOOM_SENSITIVITY,
@@ -47,6 +58,7 @@ export interface ErdCanvasProps {
 }
 
 const nodeTypes = { table: TableNode };
+const edgeTypes = { fk: FkEdge };
 
 export const TRACKPAD_VIEWPORT_OPTIONS = Object.freeze({
   panOnScroll: true,
@@ -57,6 +69,19 @@ export const TRACKPAD_VIEWPORT_OPTIONS = Object.freeze({
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 2.5;
+
+export function createInitialFlowState(
+  schema: ErdSchema,
+  layout: ErdLayout,
+  onAnnotationChange?: TableAnnotationChangeHandler,
+  onEditNote?: TableNoteEditHandler,
+) {
+  const nodes = createFlowNodes(schema, layout, onAnnotationChange, onEditNote);
+  return {
+    nodes,
+    edges: createFlowEdges(schema, nodes, 'settled'),
+  };
+}
 
 export function ErdCanvas(props: ErdCanvasProps) {
   return (
@@ -93,13 +118,13 @@ function ErdCanvasInner({
     emitLayout(updateNodeAnnotation(latestLayout.current, tableId, position, patch));
   }, [emitLayout]);
 
-  const initialNodes = useMemo(
-    () => createFlowNodes(schema, layout, handleAnnotationChange, onEditNote),
+  const initialFlow = useMemo(
+    () => createInitialFlowState(schema, layout, handleAnnotationChange, onEditNote),
     [handleAnnotationChange, layout, onEditNote, schema],
   );
-  const initialEdges = useMemo(() => createFlowEdges(schema), [schema]);
-  const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>(initialFlow.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FkFlowEdge>(initialFlow.edges);
+  const [routingMode, setRoutingMode] = useState<FkRoutingMode>('settled');
 
   useEffect(() => {
     latestLayout.current = layout;
@@ -110,10 +135,24 @@ function ErdCanvasInner({
         ...(selectedIds.has(node.id) ? { selected: true } : {}),
       }));
     });
-    setEdges(createFlowEdges(schema));
-  }, [handleAnnotationChange, layout, onEditNote, schema, setEdges, setNodes]);
+  }, [handleAnnotationChange, layout, onEditNote, schema, setNodes]);
+
+  useEffect(() => {
+    setEdges((current) => {
+      const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id));
+      return createFlowEdges(schema, nodes, routingMode).map((edge) => ({
+        ...edge,
+        ...(selectedIds.has(edge.id) ? { selected: true } : {}),
+      }));
+    });
+  }, [nodes, routingMode, schema, setEdges]);
+
+  const handleNodeDragStart: OnNodeDrag<TableFlowNode> = useCallback(() => {
+    setRoutingMode((current) => transitionFkRoutingMode(current, 'drag-start'));
+  }, []);
 
   const handleNodeDragStop: OnNodeDrag<TableFlowNode> = useCallback((_, node) => {
+    setRoutingMode((current) => transitionFkRoutingMode(current, 'drag-stop'));
     emitLayout(updateNodeLayout(latestLayout.current, node.id, node.position));
   }, [emitLayout]);
 
@@ -161,8 +200,10 @@ function ErdCanvasInner({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onMoveEnd={handleMoveEnd}
         onNodeDoubleClick={handleNodeDoubleClick}
