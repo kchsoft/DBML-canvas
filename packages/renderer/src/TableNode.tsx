@@ -12,6 +12,10 @@ import type { TableColor } from '@dbml-canvas/core';
 import { DetailsCard } from './DetailsCard.js';
 import { TableColorSettings } from './TableColorSettings.js';
 import type { TableFlowNode } from './graph.js';
+import {
+  makeFkHandleId,
+  type FkHandleSide,
+} from './fk-routing.js';
 import type { ColumnDetails, TableDetails } from './schema-details.js';
 
 type ActiveDetail = { kind: 'table' } | { kind: 'column'; columnId: string };
@@ -19,6 +23,23 @@ type PopoverSide = 'left' | 'right';
 
 const OPEN_DELAY_MS = 200;
 const CLOSE_DELAY_MS = 120;
+
+function columnHandles(
+  columnId: string,
+  side: FkHandleSide,
+  position: Position,
+) {
+  return (['source', 'target'] as const).map((role) => (
+    <Handle
+      key={`${role}:${side}`}
+      id={makeFkHandleId(role, side, columnId)}
+      type={role}
+      position={position}
+      className={`dbml-column-handle is-${side} is-${role}`}
+      isConnectable={false}
+    />
+  ));
+}
 
 export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
   const { table, details, layout, onAnnotationChange, onEditNote } = data;
@@ -242,13 +263,7 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
               }}
               onBlur={handleBlur}
             >
-              <Handle
-                id={`target:${column.id}`}
-                type="target"
-                position={Position.Left}
-                className="dbml-column-handle"
-                isConnectable={false}
-              />
+              {columnHandles(column.id, 'left', Position.Left)}
 
               <span className="dbml-column-flags" aria-label="Column constraints">
                 {columnDetails?.compactLabels.map((label) => <strong key={label}>{label}</strong>)}
@@ -257,13 +272,7 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
               <span className="dbml-column-type">{column.type}</span>
               <span className="dbml-column-nullability">{column.nullable ? 'NULL' : 'NN'}</span>
 
-              <Handle
-                id={`source:${column.id}`}
-                type="source"
-                position={Position.Right}
-                className="dbml-column-handle"
-                isConnectable={false}
-              />
+              {columnHandles(column.id, 'right', Position.Right)}
               {activeDetail?.kind === 'column' && activeDetail.columnId === column.id
                 ? detailPopover
                 : null}

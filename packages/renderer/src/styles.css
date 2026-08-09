@@ -405,6 +405,11 @@
   background: var(--dbml-accent) !important;
 }
 
+.dbml-column-handle.is-source,
+.dbml-column-handle.is-target {
+  pointer-events: none;
+}
+
 .react-flow__edge-text {
   fill: var(--dbml-muted);
 }

@@ -26,6 +26,7 @@ import {
   type SourceRange,
 } from '@dbml-canvas/core';
 import { createFlowEdges, createFlowNodes, type TableFlowNode } from './graph.js';
+import type { FkFlowEdge } from './fk-routing.js';
 import { TableNode } from './TableNode.js';
 import {
   CONTROL_WHEEL_ZOOM_SENSITIVITY,
@@ -155,7 +156,7 @@ function ErdCanvasInner({
 
   return (
     <div ref={canvasRef} className={className ? `dbml-canvas ${className}` : 'dbml-canvas'}>
-      <ReactFlow<TableFlowNode>
+      <ReactFlow<TableFlowNode, FkFlowEdge>
         colorMode={colorMode}
         nodes={nodes}
         edges={edges}

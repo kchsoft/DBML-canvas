@@ -7,7 +7,14 @@ import type {
   NodeLayout,
 } from '@dbml-canvas/core';
 import { applyLayout } from '@dbml-canvas/core';
-import type { Edge, Node } from '@xyflow/react';
+import type { Node } from '@xyflow/react';
+import {
+  chooseFkHandleSides,
+  makeFkHandleId,
+  type FkFlowEdge,
+  type FkGeometryNode,
+  type FkRoutingMode,
+} from './fk-routing.js';
 import { createSchemaDetails, type TableDetails } from './schema-details.js';
 
 export interface TableNodeData extends Record<string, unknown> {
@@ -64,10 +71,25 @@ export function createFlowNodes(
   });
 }
 
-export function createFlowEdges(schema: ErdSchema): Edge[] {
+export function createFlowEdges(
+  schema: ErdSchema,
+  nodes: FkGeometryNode[] = [],
+  routingMode: FkRoutingMode = 'settled',
+): FkFlowEdge[] {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+
   return schema.relationships.map((relationship) => {
     const sourceColumnId = relationship.source.columnIds[0];
     const targetColumnId = relationship.target.columnIds[0];
+    const sourceNode = nodesById.get(relationship.source.tableId) ?? {
+      id: relationship.source.tableId,
+      position: { x: 0, y: 0 },
+    };
+    const targetNode = nodesById.get(relationship.target.tableId) ?? {
+      id: relationship.target.tableId,
+      position: { x: 0, y: 0 },
+    };
+    const sides = chooseFkHandleSides(sourceNode, targetNode);
     const label = relationship.name
       ?? `${relationship.source.cardinality} : ${relationship.target.cardinality}`;
 
@@ -75,9 +97,17 @@ export function createFlowEdges(schema: ErdSchema): Edge[] {
       id: relationship.id,
       source: relationship.source.tableId,
       target: relationship.target.tableId,
-      ...(sourceColumnId ? { sourceHandle: `source:${sourceColumnId}` } : {}),
-      ...(targetColumnId ? { targetHandle: `target:${targetColumnId}` } : {}),
-      type: 'smoothstep',
+      ...(sourceColumnId
+        ? { sourceHandle: makeFkHandleId('source', sides.source, sourceColumnId) }
+        : {}),
+      ...(targetColumnId
+        ? { targetHandle: makeFkHandleId('target', sides.target, targetColumnId) }
+        : {}),
+      type: 'fk',
+      data: {
+        routingMode,
+        selfReference: relationship.source.tableId === relationship.target.tableId,
+      },
       label,
       labelStyle: { fontSize: 11 },
       style: { strokeWidth: 1.5 },
