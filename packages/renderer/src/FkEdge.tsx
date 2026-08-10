@@ -7,12 +7,12 @@ import {
 import {
   BaseEdge,
   getSmoothStepPath,
-  useNodes,
+  useStore,
   type EdgeProps,
   type Node,
   type Position,
 } from '@xyflow/react';
-import type { CSSProperties } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import type { FkFocusState } from './fk-focus.js';
 import type { TableFlowNode } from './graph.js';
 import type { FkFlowEdge, FkRoutingMode } from './fk-routing.js';
@@ -149,19 +149,52 @@ export function resolveFkRoute(
   }
 }
 
+export function areFkRoutingNodesEqual(left: Node[], right: Node[]): boolean {
+  if (left.length !== right.length) return false;
+
+  return left.every((node, index) => {
+    const other = right[index];
+    return other !== undefined
+      && node.id === other.id
+      && node.position.x === other.position.x
+      && node.position.y === other.position.y
+      && node.measured?.width === other.measured?.width
+      && node.measured?.height === other.measured?.height
+      && node.width === other.width
+      && node.height === other.height
+      && node.hidden === other.hidden;
+  });
+}
+
 export function FkEdge(props: EdgeProps<FkFlowEdge>) {
-  const nodes = useNodes<TableFlowNode>();
-  const route = resolveFkRoute(
-    {
-      sourceX: props.sourceX,
-      sourceY: props.sourceY,
-      sourcePosition: props.sourcePosition,
-      targetX: props.targetX,
-      targetY: props.targetY,
-      targetPosition: props.targetPosition,
-    },
-    nodes,
-    props.data?.routingMode ?? 'settled',
+  const nodes = useStore(
+    (state) => state.nodes as TableFlowNode[],
+    areFkRoutingNodesEqual,
+  );
+  const routingMode = props.data?.routingMode ?? 'settled';
+  const route = useMemo(
+    () => resolveFkRoute(
+      {
+        sourceX: props.sourceX,
+        sourceY: props.sourceY,
+        sourcePosition: props.sourcePosition,
+        targetX: props.targetX,
+        targetY: props.targetY,
+        targetPosition: props.targetPosition,
+      },
+      nodes,
+      routingMode,
+    ),
+    [
+      nodes,
+      props.sourcePosition,
+      props.sourceX,
+      props.sourceY,
+      props.targetPosition,
+      props.targetX,
+      props.targetY,
+      routingMode,
+    ],
   );
   const visual = getFkEdgeVisualProps(props.data?.focusState ?? 'idle', props.style);
   const labelStyle = { ...props.labelStyle, ...visual.labelStyle };

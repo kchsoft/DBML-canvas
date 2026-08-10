@@ -33,14 +33,16 @@ import {
   type NodeAnnotationPatch,
   type SourceRange,
 } from '@dbml-canvas/core';
-import { FkEdge } from './FkEdge.js';
+import { areFkRoutingNodesEqual, FkEdge } from './FkEdge.js';
 import {
   deriveFkFocusPresentation,
+  reconcileFkFocus,
   transitionFkFocus,
   type FkFocus,
   type FkFocusPresentation,
 } from './fk-focus.js';
 import {
+  applyFkFocusPresentationToNodes,
   createFlowEdges,
   createFlowNodes,
   type TableAnnotationChangeHandler,
@@ -129,7 +131,7 @@ function ErdCanvasInner({
   const latestLayout = useRef(layout);
   const [fkFocus, setFkFocus] = useState<FkFocus>();
   const fkPresentation = useMemo(
-    () => deriveFkFocusPresentation(schema, fkFocus),
+    () => deriveFkFocusPresentation(schema, reconcileFkFocus(schema, fkFocus)),
     [fkFocus, schema],
   );
 
@@ -159,11 +161,10 @@ function ErdCanvasInner({
       layout,
       handleAnnotationChange,
       onEditNote,
-      fkPresentation,
+      undefined,
       handleFkColumnFocus,
     ),
     [
-      fkPresentation,
       handleAnnotationChange,
       handleFkColumnFocus,
       layout,
@@ -188,7 +189,7 @@ function ErdCanvasInner({
         layout,
         handleAnnotationChange,
         onEditNote,
-        fkPresentation,
+        undefined,
         handleFkColumnFocus,
       ).map((node) => ({
         ...node,
@@ -196,7 +197,6 @@ function ErdCanvasInner({
       }));
     });
   }, [
-    fkPresentation,
     handleAnnotationChange,
     handleFkColumnFocus,
     layout,
@@ -206,14 +206,28 @@ function ErdCanvasInner({
   ]);
 
   useEffect(() => {
+    setNodes((current) => applyFkFocusPresentationToNodes(
+      current,
+      fkPresentation,
+      handleFkColumnFocus,
+    ));
+  }, [fkPresentation, handleFkColumnFocus, setNodes]);
+
+  const routingNodesRef = useRef(nodes);
+  if (!areFkRoutingNodesEqual(routingNodesRef.current, nodes)) {
+    routingNodesRef.current = nodes;
+  }
+  const routingNodes = routingNodesRef.current;
+
+  useEffect(() => {
     setEdges((current) => {
       const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id));
-      return createFlowEdges(schema, nodes, routingMode, fkPresentation).map((edge) => ({
+      return createFlowEdges(schema, routingNodes, routingMode, fkPresentation).map((edge) => ({
         ...edge,
         ...(selectedIds.has(edge.id) ? { selected: true } : {}),
       }));
     });
-  }, [fkPresentation, nodes, routingMode, schema, setEdges]);
+  }, [fkPresentation, routingMode, routingNodes, schema, setEdges]);
 
   const handleEdgeClick: EdgeMouseHandler<FkFlowEdge> = useCallback((event, edge) => {
     event.stopPropagation();

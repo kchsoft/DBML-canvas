@@ -5,7 +5,11 @@ import {
   makeFkHandleId,
   transitionFkRoutingMode,
 } from '../dist/fk-routing.js';
-import { createFlowEdges, createFlowNodes } from '../dist/graph.js';
+import {
+  applyFkFocusPresentationToNodes,
+  createFlowEdges,
+  createFlowNodes,
+} from '../dist/graph.js';
 
 const node = (id, x, width = 340) => ({
   id,
@@ -168,4 +172,18 @@ test('carries one focus presentation into table nodes and FK edges', () => {
   const edges = createFlowEdges(graphSchema, nodes, 'settled', presentation);
   assert.equal(edges.find(({ id }) => id === 'orders-user').data.focusState, 'focused');
   assert.equal(edges.find(({ id }) => id === 'orders-team').data.focusState, 'dimmed');
+
+  const measuredNodes = nodes.map((flowNode) => ({
+    ...flowNode,
+    measured: { width: 340, height: 120 },
+  }));
+  const updatedNodes = applyFkFocusPresentationToNodes(
+    measuredNodes,
+    presentation,
+    onFkColumnFocus,
+  );
+  const updatedOrders = updatedNodes.find(({ id }) => id === 'public.orders');
+  assert.deepEqual(updatedOrders.measured, { width: 340, height: 120 });
+  assert.equal(updatedOrders.position, measuredNodes[0].position);
+  assert.equal(updatedOrders.data.activeFkColumnId, 'public.orders.user_id');
 });

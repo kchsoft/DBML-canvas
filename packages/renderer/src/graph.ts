@@ -90,6 +90,38 @@ export function createFlowNodes(
   });
 }
 
+export function applyFkFocusPresentationToNodes(
+  nodes: TableFlowNode[],
+  fkPresentation: FkFocusPresentation,
+  onFkColumnFocus?: (columnId: string) => void,
+): TableFlowNode[] {
+  return nodes.map((node) => {
+    const {
+      activeFkColumnId: _activeFkColumnId,
+      relatedFkColumnIds: _relatedFkColumnIds,
+      onFkColumnFocus: _onFkColumnFocus,
+      ...stableData
+    } = node.data;
+    const tableColumnIds = new Set(node.data.table.columns.map((column) => column.id));
+    const relatedFkColumnIds = node.data.table.columns
+      .map((column) => column.id)
+      .filter((columnId) => fkPresentation.endpointColumnIds.has(columnId));
+
+    return {
+      ...node,
+      data: {
+        ...stableData,
+        ...(fkPresentation.activeColumnId
+          && tableColumnIds.has(fkPresentation.activeColumnId)
+          ? { activeFkColumnId: fkPresentation.activeColumnId }
+          : {}),
+        ...(relatedFkColumnIds.length > 0 ? { relatedFkColumnIds } : {}),
+        ...(onFkColumnFocus ? { onFkColumnFocus } : {}),
+      },
+    };
+  });
+}
+
 export function createFlowEdges(
   schema: ErdSchema,
   nodes: FkGeometryNode[] = [],
