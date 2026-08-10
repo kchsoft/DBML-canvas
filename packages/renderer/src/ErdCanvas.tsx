@@ -46,15 +46,17 @@ import {
   applyFkFocusPresentationToNodes,
   createFlowEdges,
   createFlowNodes,
+  updateFlowEdgesDuringDrag,
   type TableAnnotationChangeHandler,
   type TableFlowNode,
   type TableNoteEditHandler,
 } from './graph.js';
+import type { FkFlowEdge } from './fk-routing.js';
 import {
-  transitionFkRoutingMode,
-  type FkFlowEdge,
-  type FkRoutingMode,
-} from './fk-routing.js';
+  reconcileFkDragSession,
+  startFkDragSession,
+  type FkDragSession,
+} from './fk-drag-session.js';
 import { TableNode } from './TableNode.js';
 import { handleSchemaExplorerEscape, SchemaExplorer } from './SchemaExplorer.js';
 import {
@@ -211,16 +213,18 @@ function ErdCanvasInner({
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>(initialFlow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FkFlowEdge>(initialFlow.edges);
-  const [routingMode, setRoutingMode] = useState<FkRoutingMode>('settled');
+  const [fkDragSession, setFkDragSession] = useState<FkDragSession>();
 
   useEffect(() => {
     cancelSchemaNavigation(searchNavigationRef);
+    setFkDragSession((current) => reconcileFkDragSession(current, schema));
     setFkFocus((current) => transitionFkFocus(schema, current, { type: 'schema' }));
     setSearchSelection((current) => reconcileSchemaSearchSelection(schema, current));
   }, [schema]);
 
   useEffect(() => {
     latestLayout.current = layout;
+    setFkDragSession(undefined);
     setNodes((current) => {
       const selectedIds = new Set(current.filter((node) => node.selected).map((node) => node.id));
       return createFlowNodes(
@@ -265,13 +269,23 @@ function ErdCanvasInner({
 
   useEffect(() => {
     setEdges((current) => {
+      if (fkDragSession) {
+        return updateFlowEdgesDuringDrag(
+          schema,
+          routingNodes,
+          current,
+          fkDragSession.movedNodeIds,
+          fkPresentation,
+        );
+      }
+
       const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id));
-      return createFlowEdges(schema, routingNodes, routingMode, fkPresentation).map((edge) => ({
+      return createFlowEdges(schema, routingNodes, 'settled', fkPresentation).map((edge) => ({
         ...edge,
         ...(selectedIds.has(edge.id) ? { selected: true } : {}),
       }));
     });
-  }, [fkPresentation, routingMode, routingNodes, schema, setEdges]);
+  }, [fkDragSession, fkPresentation, routingNodes, schema, setEdges]);
 
   const handleEdgeClick: EdgeMouseHandler<FkFlowEdge> = useCallback((event, edge) => {
     event.stopPropagation();
@@ -299,12 +313,12 @@ function ErdCanvasInner({
     );
   }, [clearFkFocus, handleSchemaExplorerClose, schemaExplorerOpen]);
 
-  const handleNodeDragStart: OnNodeDrag<TableFlowNode> = useCallback(() => {
-    setRoutingMode((current) => transitionFkRoutingMode(current, 'drag-start'));
-  }, []);
+  const handleNodeDragStart: OnNodeDrag<TableFlowNode> = useCallback((_, node, draggedNodes) => {
+    setFkDragSession(startFkDragSession(nodes, node, draggedNodes));
+  }, [nodes]);
 
   const handleNodeDragStop: OnNodeDrag<TableFlowNode> = useCallback((_, node) => {
-    setRoutingMode((current) => transitionFkRoutingMode(current, 'drag-stop'));
+    setFkDragSession(undefined);
     emitLayout(updateNodeLayout(latestLayout.current, node.id, node.position));
   }, [emitLayout]);
 
