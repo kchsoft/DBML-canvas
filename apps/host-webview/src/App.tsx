@@ -18,6 +18,7 @@ import {
   type ThemePreference,
 } from './theme-preference.js';
 import { createNoteEditSession } from './note-edit-session.js';
+import { reconcileLayoutState } from './layout-sync.js';
 
 const parser = new DbmlCoreSchemaParser();
 
@@ -90,7 +91,7 @@ export function App() {
   }, [theme]);
 
   const handleLayoutChange = useCallback((nextLayout: ErdLayout) => {
-    setLayout(nextLayout);
+    setLayout((current) => reconcileLayoutState(current, nextLayout));
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       postToHost({ type: 'webview/save-layout', payload: { layout: nextLayout } });

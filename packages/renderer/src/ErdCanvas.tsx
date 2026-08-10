@@ -183,25 +183,17 @@ function ErdCanvasInner({
     }));
   }, [schema]);
 
-  const initialFlow = useMemo(
-    () => createInitialFlowState(
-      schema,
-      layout,
-      handleAnnotationChange,
-      onEditNote,
-      undefined,
-      handleFkColumnFocus,
-      searchSelection,
-    ),
-    [
-      handleAnnotationChange,
-      handleFkColumnFocus,
-      layout,
-      onEditNote,
-      searchSelection,
-      schema,
-    ],
-  );
+  // Only ever consumed as the mount-time seed for useNodesState/useEdgesState, so build it
+  // once instead of rebuilding the whole graph on every render just to discard it.
+  const [initialFlow] = useState(() => createInitialFlowState(
+    schema,
+    layout,
+    handleAnnotationChange,
+    onEditNote,
+    undefined,
+    handleFkColumnFocus,
+    searchSelection,
+  ));
   const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>(initialFlow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FkFlowEdge>(initialFlow.edges);
   const [fkDragSession, setFkDragSession] = useState<FkDragSession>();
@@ -219,6 +211,16 @@ function ErdCanvasInner({
 
   useEffect(() => {
     latestLayout.current = layout;
+  }, [layout]);
+
+  // Node geometry and annotations live entirely in `layout.nodes`; `updateViewport` preserves
+  // that reference, so panning and zooming no longer rebuild every table node.
+  const nodeLayout = useMemo<ErdLayout>(
+    () => ({ version: 1, nodes: layout.nodes }),
+    [layout.nodes],
+  );
+
+  useEffect(() => {
     setFkDragSession(undefined);
     setMiniMapSnapshot(undefined);
     setViewportMiniMapSnapshot(undefined);
@@ -226,7 +228,7 @@ function ErdCanvasInner({
       const selectedIds = new Set(current.filter((node) => node.selected).map((node) => node.id));
       const nextNodes = createFlowNodes(
         schema,
-        layout,
+        nodeLayout,
         handleAnnotationChange,
         onEditNote,
         undefined,
@@ -241,7 +243,7 @@ function ErdCanvasInner({
   }, [
     handleAnnotationChange,
     handleFkColumnFocus,
-    layout,
+    nodeLayout,
     onEditNote,
     schema,
     setNodes,

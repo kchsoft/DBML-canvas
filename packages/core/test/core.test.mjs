@@ -9,6 +9,7 @@ import {
   serializeLayout,
   updateNodeAnnotation,
   updateNodeLayout,
+  updateViewport,
 } from '../dist/index.js';
 
 const token = (start, end) => ({
@@ -211,4 +212,21 @@ test('merges, validates, updates, and prunes layout data', () => {
     nodes: { 'public.member': { x: 1, y: 1 }, missing: { x: 2, y: 2 } },
   }, schema);
   assert.equal(pruned.nodes.missing, undefined);
+});
+
+test('updateViewport keeps the node map identical so panning cannot rebuild the graph', () => {
+  const layout = {
+    version: 1,
+    nodes: { 'public.member': { x: 10, y: 20 }, 'public.order': { x: 30, y: 40 } },
+    viewport: { x: 0, y: 0, zoom: 1 },
+  };
+
+  const panned = updateViewport(layout, { x: -120, y: -80, zoom: 1 });
+
+  assert.notEqual(panned, layout);
+  assert.deepEqual(panned.viewport, { x: -120, y: -80, zoom: 1 });
+  assert.equal(panned.nodes, layout.nodes);
+
+  const moved = updateNodeLayout(layout, 'public.member', { x: 11, y: 20 });
+  assert.notEqual(moved.nodes, layout.nodes);
 });
