@@ -35,6 +35,10 @@ import {
 } from '@dbml-canvas/core';
 import { FkEdge } from './FkEdge.js';
 import {
+  DragStableMiniMapNode,
+  MiniMapDragSnapshotProvider,
+} from './DragStableMiniMapNode.js';
+import {
   deriveFkFocusPresentation,
   reconcileFkFocus,
   transitionFkFocus,
@@ -435,7 +439,16 @@ function ErdCanvasInner({
           onClose={handleSchemaExplorerClose}
         />
         <Controls showInteractive={false} />
-        {showMiniMap ? <MiniMap pannable zoomable nodeStrokeWidth={3} /> : null}
+        {showMiniMap ? (
+          <MiniMapDragSnapshotProvider nodes={fkDragSession?.frozenNodes}>
+            <MiniMap
+              pannable
+              zoomable
+              nodeStrokeWidth={3}
+              nodeComponent={DragStableMiniMapNode}
+            />
+          </MiniMapDragSnapshotProvider>
+        ) : null}
       </ReactFlow>
     </div>
   );
