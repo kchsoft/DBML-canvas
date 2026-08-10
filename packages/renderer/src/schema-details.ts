@@ -14,6 +14,12 @@ export interface ForeignKeyDetail {
   columnNames: string[];
 }
 
+export interface EnumDetail {
+  id: string;
+  name: string;
+  values: ErdSchema['enums'][number]['values'];
+}
+
 export interface ColumnDetails {
   kind: 'column';
   id: string;
@@ -21,6 +27,7 @@ export interface ColumnDetails {
   type: string;
   note?: string;
   defaultValue?: string;
+  enum?: EnumDetail;
   indexes: ErdIndex[];
   compactLabels: CompactConstraintLabel[];
   fullConstraints: string[];
@@ -41,6 +48,10 @@ export interface TableDetails {
 export type SchemaDetails = Record<string, TableDetails>;
 
 export function createSchemaDetails(schema: ErdSchema): SchemaDetails {
+  const enumsById = new Map((schema.enums ?? []).map((enumDefinition) => [
+    enumDefinition.id,
+    enumDefinition,
+  ]));
   const tablesById = new Map(schema.tables.map((table) => [table.id, table]));
   const columnsById = new Map(
     schema.tables.flatMap((table) => table.columns.map((column) => [column.id, column] as const)),
@@ -69,6 +80,7 @@ export function createSchemaDetails(schema: ErdSchema): SchemaDetails {
   return Object.fromEntries(schema.tables.map((table) => {
     const indexes = table.indexes ?? [];
     const columns = Object.fromEntries(table.columns.map((column) => {
+      const enumDefinition = column.enumId ? enumsById.get(column.enumId) : undefined;
       const columnForeignKeys = foreignKeys.get(column.id) ?? [];
       const compactLabels: CompactConstraintLabel[] = [];
       if (column.primaryKey) compactLabels.push('PK');
@@ -91,6 +103,13 @@ export function createSchemaDetails(schema: ErdSchema): SchemaDetails {
         compactLabels,
         fullConstraints,
         foreignKeys: columnForeignKeys,
+        ...(enumDefinition && enumDefinition.values.length > 0 ? {
+          enum: {
+            id: enumDefinition.id,
+            name: enumDefinition.name,
+            values: enumDefinition.values.map((value) => ({ ...value })),
+          },
+        } : {}),
         ...(column.note ? { note: column.note } : {}),
         ...(column.defaultValue ? { defaultValue: column.defaultValue } : {}),
         ...(column.source ? {

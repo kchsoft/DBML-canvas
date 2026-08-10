@@ -4,6 +4,16 @@ import { createSchemaDetails } from '../dist/schema-details.js';
 
 const schema = {
   version: 1,
+  enums: [{
+    id: 'public.member_status',
+    schema: 'public',
+    name: 'member_status',
+    displayName: 'member_status',
+    values: [
+      { name: 'pending', note: 'Awaiting review' },
+      { name: 'active' },
+    ],
+  }],
   tables: [
     {
       id: 'public.members',
@@ -26,6 +36,15 @@ const schema = {
           id: 'public.members.email', tableId: 'public.members', name: 'email', type: 'varchar(255)',
           primaryKey: false, unique: true, nullable: false, increment: false,
           defaultValue: "'unknown@example.com'", note: 'Login address',
+        },
+        {
+          id: 'public.members.status', tableId: 'public.members', name: 'status', type: 'member_status',
+          primaryKey: false, unique: false, nullable: false, increment: false,
+          enumId: 'public.member_status',
+        },
+        {
+          id: 'public.members.external_status', tableId: 'public.members', name: 'external_status',
+          type: 'member_status', primaryKey: false, unique: false, nullable: true, increment: false,
         },
       ],
     },
@@ -115,4 +134,21 @@ test('includes notes, defaults, indexes, and referenced column information', () 
     columnIds: ['public.members.id'],
     columnNames: ['id'],
   }]);
+});
+
+test('attaches ordered enum values only to parser-resolved enum columns', () => {
+  const details = createSchemaDetails(schema);
+
+  assert.deepEqual(details['public.members'].columns['public.members.status'].enum, {
+    id: 'public.member_status',
+    name: 'member_status',
+    values: [
+      { name: 'pending', note: 'Awaiting review' },
+      { name: 'active' },
+    ],
+  });
+  assert.equal(
+    details['public.members'].columns['public.members.external_status'].enum,
+    undefined,
+  );
 });
