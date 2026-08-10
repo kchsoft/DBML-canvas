@@ -53,8 +53,9 @@ export function buildSchemaExplorerResults(
     .sort((left, right) => {
       const leftName = left.table.displayName.toLowerCase();
       const rightName = right.table.displayName.toLowerCase();
-      const comparison = leftName < rightName ? -1 : leftName > rightName ? 1 : left.index - right.index;
-      return direction === 'desc' ? -comparison : comparison;
+      const nameComparison = leftName < rightName ? -1 : leftName > rightName ? 1 : 0;
+      if (nameComparison === 0) return left.index - right.index;
+      return direction === 'desc' ? -nameComparison : nameComparison;
     })
     .map(({ table }) => {
       const tableMatchRanges = findTextMatchRanges(table.displayName, normalizedQuery);

@@ -99,6 +99,10 @@ test('omits unmatched tables and preserves schema order for duplicate display na
     ['public.zed', 'public.alpha'],
   );
   assert.deepEqual(
+    buildSchemaExplorerResults(duplicateSchema, 'same', 'desc').map(({ table }) => table.id),
+    ['public.zed', 'public.alpha'],
+  );
+  assert.deepEqual(
     buildSchemaExplorerResults(schema, 'does-not-exist', 'asc'),
     [],
   );
