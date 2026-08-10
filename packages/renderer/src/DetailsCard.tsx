@@ -88,6 +88,7 @@ export function DetailsCard({
           <ul
             className="dbml-details-list dbml-enum-values"
             aria-label={`${detail.enum.name} values`}
+            tabIndex={0}
           >
             {detail.enum.values.map((value) => (
               <li key={value.name}>

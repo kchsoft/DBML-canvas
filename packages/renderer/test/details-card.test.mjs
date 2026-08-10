@@ -26,6 +26,10 @@ test('renders enum values and notes in declaration order', async () => {
         values: [
           { name: 'pending', note: 'Awaiting review' },
           { name: 'active' },
+          {
+            name: 'archived_after_extended_compliance_review',
+            note: 'Retained for historical records after a long compliance review.',
+          },
         ],
       },
     },
@@ -40,8 +44,12 @@ test('renders enum values and notes in declaration order', async () => {
   );
   assert.match(markup, /<ul class="dbml-details-list dbml-enum-values"/);
   assert.match(markup, /aria-label="member_status values"/);
+  assert.match(markup, /tabindex="0"/);
+  assert.match(markup, /archived_after_extended_compliance_review/);
   assert.match(css, /\.dbml-enum-values\s*\{[^}]*max-height:/s);
   assert.match(css, /\.dbml-enum-values\s*\{[^}]*overflow-y:\s*auto;/s);
+  assert.match(css, /\.dbml-enum-values:focus-visible\s*\{[^}]*outline:/s);
+  assert.match(css, /\.dbml-enum-values li\s*\{[^}]*flex-wrap:\s*wrap;/s);
 });
 
 test('omits allowed values for a normal column', () => {

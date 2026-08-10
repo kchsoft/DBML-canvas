@@ -322,15 +322,27 @@
   border-left: 2px solid color-mix(in srgb, var(--dbml-accent) 45%, transparent);
 }
 
+.dbml-enum-values:focus-visible {
+  outline: 2px solid var(--dbml-accent);
+  outline-offset: 2px;
+}
+
 .dbml-enum-values li {
-  display: grid;
-  grid-template-columns: minmax(84px, max-content) minmax(0, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   align-items: baseline;
   padding-left: 10px;
 }
 
+.dbml-enum-values code {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .dbml-enum-values span {
+  min-width: 0;
+  flex: 1 1 160px;
   color: var(--dbml-muted);
   overflow-wrap: anywhere;
 }

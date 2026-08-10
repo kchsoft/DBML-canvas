@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyLayout,
+  DbmlCoreSchemaParser,
   mapDatabase,
   parseLayout,
   pruneLayout,
@@ -102,6 +103,55 @@ test('maps resolved enum definitions and column associations in declaration orde
   }]);
   assert.equal(schema.tables[0].columns[0].enumId, 'account.member_status');
   assert.equal(schema.tables[0].columns[1].enumId, undefined);
+});
+
+test('skips malformed enum definitions and values with warnings', () => {
+  const schema = mapDatabase({
+    schemas: [{
+      name: 'public',
+      enums: [
+        null,
+        {
+          name: 'status',
+          values: [null, { name: 'active' }],
+        },
+      ],
+      tables: [],
+      refs: [],
+    }],
+  });
+
+  assert.deepEqual(schema.enums, [{
+    id: 'public.status',
+    schema: 'public',
+    name: 'status',
+    displayName: 'status',
+    values: [{ name: 'active' }],
+  }]);
+  assert.deepEqual(schema.warnings, [
+    'Skipped an enum without a name in schema public.',
+    'Skipped an unnamed value in enum public.status.',
+  ]);
+});
+
+test('preserves a real parser resolved enum from another schema', () => {
+  const schema = new DbmlCoreSchemaParser().parse(`
+Enum account.member_status {
+  pending [note: 'Awaiting review']
+  active
+}
+
+Table member {
+  status account.member_status
+}
+`);
+
+  assert.equal(schema.enums[0].id, 'account.member_status');
+  assert.deepEqual(schema.enums[0].values, [
+    { name: 'pending', note: 'Awaiting review' },
+    { name: 'active' },
+  ]);
+  assert.equal(schema.tables[0].columns[0].enumId, 'account.member_status');
 });
 
 test('merges, validates, updates, and prunes layout data', () => {

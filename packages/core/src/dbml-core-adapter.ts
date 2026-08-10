@@ -115,6 +115,10 @@ export function mapDatabase(database: DbmlDatabase, options: ParseOptions = {}):
     const schemaName = asNonEmptyString(rawSchema.name) ?? 'public';
     const rawEnums = Array.isArray(rawSchema.enums) ? rawSchema.enums : [];
     for (const rawEnum of rawEnums) {
+      if (!isRecord(rawEnum)) {
+        warnings.push(`Skipped an enum without a name in schema ${schemaName}.`);
+        continue;
+      }
       const enumName = asNonEmptyString(rawEnum.name);
       if (!enumName) {
         warnings.push(`Skipped an enum without a name in schema ${schemaName}.`);
@@ -122,6 +126,10 @@ export function mapDatabase(database: DbmlDatabase, options: ParseOptions = {}):
       }
 
       const values = (Array.isArray(rawEnum.values) ? rawEnum.values : []).flatMap((value) => {
+        if (!isRecord(value)) {
+          warnings.push(`Skipped an unnamed value in enum ${schemaName}.${enumName}.`);
+          return [];
+        }
         const valueName = asNonEmptyString(value.name);
         if (!valueName) {
           warnings.push(`Skipped an unnamed value in enum ${schemaName}.${enumName}.`);
