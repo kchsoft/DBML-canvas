@@ -33,7 +33,7 @@ import {
   type NodeAnnotationPatch,
   type SourceRange,
 } from '@dbml-canvas/core';
-import { areFkRoutingNodesEqual, FkEdge } from './FkEdge.js';
+import { FkEdge } from './FkEdge.js';
 import {
   deriveFkFocusPresentation,
   reconcileFkFocus,
@@ -98,6 +98,23 @@ export const TRACKPAD_VIEWPORT_OPTIONS = Object.freeze({
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 2.5;
+
+function areFkRoutingNodesEqual(left: TableFlowNode[], right: TableFlowNode[]): boolean {
+  if (left.length !== right.length) return false;
+
+  return left.every((node, index) => {
+    const other = right[index];
+    return other !== undefined
+      && node.id === other.id
+      && node.position.x === other.position.x
+      && node.position.y === other.position.y
+      && node.measured?.width === other.measured?.width
+      && node.measured?.height === other.measured?.height
+      && node.width === other.width
+      && node.height === other.height
+      && node.hidden === other.hidden;
+  });
+}
 
 export function createInitialFlowState(
   schema: ErdSchema,

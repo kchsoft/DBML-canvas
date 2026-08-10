@@ -7,14 +7,12 @@ import {
 import {
   BaseEdge,
   getSmoothStepPath,
-  useStore,
   type EdgeProps,
   type Node,
   type Position,
 } from '@xyflow/react';
 import { useMemo, type CSSProperties } from 'react';
 import type { FkFocusState } from './fk-focus.js';
-import type { TableFlowNode } from './graph.js';
 import type { FkFlowEdge, FkRoutingMode } from './fk-routing.js';
 
 const SMART_EDGE_OPTIONS = Object.freeze({
@@ -149,28 +147,8 @@ export function resolveFkRoute(
   }
 }
 
-export function areFkRoutingNodesEqual(left: Node[], right: Node[]): boolean {
-  if (left.length !== right.length) return false;
-
-  return left.every((node, index) => {
-    const other = right[index];
-    return other !== undefined
-      && node.id === other.id
-      && node.position.x === other.position.x
-      && node.position.y === other.position.y
-      && node.measured?.width === other.measured?.width
-      && node.measured?.height === other.measured?.height
-      && node.width === other.width
-      && node.height === other.height
-      && node.hidden === other.hidden;
-  });
-}
-
 export function FkEdge(props: EdgeProps<FkFlowEdge>) {
-  const nodes = useStore(
-    (state) => state.nodes as TableFlowNode[],
-    areFkRoutingNodesEqual,
-  );
+  const nodes = props.data?.routingNodes ?? [];
   const routingMode = props.data?.routingMode ?? 'settled';
   const route = useMemo(
     () => resolveFkRoute(

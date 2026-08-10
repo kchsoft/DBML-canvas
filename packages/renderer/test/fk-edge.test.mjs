@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Position } from '@xyflow/react';
 import {
-  areFkRoutingNodesEqual,
   getFkEdgeVisualProps,
   resolveFkRoute,
 } from '../dist/FkEdge.js';
@@ -186,23 +185,9 @@ test('derives balanced focused, dimmed, and idle FK edge visuals', async () => {
   assert.match(css, /\.react-flow__edge-text\s*\{[^}]*transition:[^}]*140ms/s);
 });
 
-test('treats presentation-only node updates as the same routing geometry', () => {
-  const geometry = [node('orders', 0, 20, 340, 120)];
-  const presentationOnly = geometry.map((flowNode) => ({
-    ...flowNode,
-    data: { focus: 'related' },
-  }));
-  const moved = geometry.map((flowNode) => ({
-    ...flowNode,
-    position: { x: flowNode.position.x + 1, y: flowNode.position.y },
-  }));
-  const resized = geometry.map((flowNode) => ({
-    ...flowNode,
-    measured: { width: flowNode.measured.width + 1, height: flowNode.measured.height },
-  }));
+test('FK edges consume canvas routing snapshots without subscribing to all nodes', async () => {
+  const source = await readFile(new URL('../src/FkEdge.tsx', import.meta.url), 'utf8');
 
-  assert.equal(areFkRoutingNodesEqual(geometry, presentationOnly), true);
-  assert.equal(areFkRoutingNodesEqual(geometry, moved), false);
-  assert.equal(areFkRoutingNodesEqual(geometry, resized), false);
-  assert.equal(areFkRoutingNodesEqual(geometry, []), false);
+  assert.doesNotMatch(source, /\buseStore\b/);
+  assert.doesNotMatch(source, /areFkRoutingNodesEqual/);
 });
