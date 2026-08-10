@@ -42,7 +42,17 @@ function columnHandles(
 }
 
 export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
-  const { table, details, layout, onAnnotationChange, onEditNote } = data;
+  const {
+    table,
+    details,
+    layout,
+    onAnnotationChange,
+    onEditNote,
+    activeFkColumnId,
+    relatedFkColumnIds = [],
+    onFkColumnFocus,
+  } = data;
+  const relatedFkColumns = new Set(relatedFkColumnIds);
   const [activeDetail, setActiveDetail] = useState<ActiveDetail>();
   const [popoverSide, setPopoverSide] = useState<PopoverSide>('right');
   const [pinned, setPinned] = useState(false);
@@ -147,6 +157,7 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return;
+    if (!settingsOpen && !editing && !pinned && !activeDetail) return;
     event.stopPropagation();
     setSettingsOpen(false);
     setEditing(false);
@@ -241,11 +252,28 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
       <div className="dbml-column-list">
         {table.columns.map((column) => {
           const columnDetails = details.columns[column.id];
+          const activeFk = activeFkColumnId === column.id;
+          const relatedFk = !activeFk && relatedFkColumns.has(column.id);
           return (
             <div
-              className="dbml-column-row"
+              className={`dbml-column-row${activeFk
+                ? ' is-fk-active'
+                : relatedFk ? ' is-fk-related' : ''}`}
               key={column.id}
               tabIndex={0}
+              {...(onFkColumnFocus
+                ? { 'aria-label': `Focus FK relationships for ${table.displayName}.${column.name}` }
+                : {})}
+              onClick={(event) => {
+                event.stopPropagation();
+                onFkColumnFocus?.(column.id);
+              }}
+              onKeyDown={(event) => {
+                if (!isFkFocusActivationKey(event.key)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                onFkColumnFocus?.(column.id);
+              }}
               onMouseEnter={(event) => open(
                 { kind: 'column', columnId: column.id },
                 event.currentTarget,
@@ -290,6 +318,10 @@ export function isDirectFocusTarget(target: EventTarget, currentTarget: EventTar
 
 export function canOpenDetail(detail: ActiveDetail, tableDetailSuppressed: boolean): boolean {
   return detail.kind !== 'table' || !tableDetailSuppressed;
+}
+
+export function isFkFocusActivationKey(key: string): boolean {
+  return key === 'Enter' || key === ' ';
 }
 
 function resolveDetail(

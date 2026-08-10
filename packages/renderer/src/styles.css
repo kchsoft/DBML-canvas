@@ -358,6 +358,7 @@
   min-height: 30px;
   padding: 2px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--dbml-border) 60%, transparent);
+  transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
 }
 
 .dbml-column-row:last-child {
@@ -366,6 +367,17 @@
 
 .dbml-column-row:hover {
   background: var(--dbml-row-hover);
+}
+
+.dbml-column-row.is-fk-related {
+  background: color-mix(in srgb, var(--dbml-accent) 12%, var(--dbml-surface));
+  color: color-mix(in srgb, var(--dbml-accent) 76%, var(--dbml-text));
+}
+
+.dbml-column-row.is-fk-active {
+  background: color-mix(in srgb, var(--dbml-accent) 20%, var(--dbml-surface));
+  color: color-mix(in srgb, var(--dbml-accent) 86%, var(--dbml-text));
+  box-shadow: inset 3px 0 var(--dbml-accent);
 }
 
 .dbml-column-flags {
