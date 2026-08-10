@@ -15,7 +15,7 @@ Implemented:
 - Stable internal `ErdSchema` model
 - Portable layout model and merge/prune helpers
 - React Flow renderer with draggable table nodes, column handles, relationships, zoom, pan, minimap, and source navigation callbacks
-- Hover detail cards for table Notes, indexes, column defaults, constraints, and foreign-key targets
+- Hover detail cards for table Notes, indexes, column defaults, constraints, foreign-key targets, and enum values with optional value notes
 - Five theme-aware table colors stored in the portable layout sidecar
 - Safe DBML table/column Note editing with native VS Code and IntelliJ undo/redo
 - Browser sandbox with DBML editing and local layout persistence
