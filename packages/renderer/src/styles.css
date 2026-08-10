@@ -743,6 +743,11 @@
   background: var(--dbml-surface);
 }
 
+.dbml-minimap-drag-snapshot {
+  display: contents;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dbml-schema-explorer-trigger,
   .dbml-schema-explorer button,

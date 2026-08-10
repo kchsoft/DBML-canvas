@@ -23,7 +23,6 @@ import {
   type KeyboardEvent,
 } from 'react';
 import {
-  updateNodeLayout,
   updateNodeAnnotation,
   updateViewport,
   type CanvasPoint,
@@ -35,9 +34,9 @@ import {
 } from '@dbml-canvas/core';
 import { FkEdge } from './FkEdge.js';
 import {
-  DragStableMiniMapNode,
-  MiniMapDragSnapshotProvider,
-} from './DragStableMiniMapNode.js';
+  captureMiniMapSnapshot,
+  DragStableMiniMap,
+} from './DragStableMiniMap.js';
 import {
   deriveFkFocusPresentation,
   reconcileFkFocus,
@@ -58,7 +57,9 @@ import {
 import type { FkFlowEdge } from './fk-routing.js';
 import {
   reconcileFkDragSession,
+  preserveFlowNodeMeasurements,
   startFkDragSession,
+  updateDraggedNodesLayout,
   type FkDragSession,
 } from './fk-drag-session.js';
 import { TableNode } from './TableNode.js';
@@ -218,9 +219,11 @@ function ErdCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>(initialFlow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FkFlowEdge>(initialFlow.edges);
   const [fkDragSession, setFkDragSession] = useState<FkDragSession>();
+  const [miniMapSnapshot, setMiniMapSnapshot] = useState<string>();
 
   useEffect(() => {
     cancelSchemaNavigation(searchNavigationRef);
+    setMiniMapSnapshot(undefined);
     setFkDragSession((current) => reconcileFkDragSession(current, schema));
     setFkFocus((current) => transitionFkFocus(schema, current, { type: 'schema' }));
     setSearchSelection((current) => reconcileSchemaSearchSelection(schema, current));
@@ -229,9 +232,10 @@ function ErdCanvasInner({
   useEffect(() => {
     latestLayout.current = layout;
     setFkDragSession(undefined);
+    setMiniMapSnapshot(undefined);
     setNodes((current) => {
       const selectedIds = new Set(current.filter((node) => node.selected).map((node) => node.id));
-      return createFlowNodes(
+      const nextNodes = createFlowNodes(
         schema,
         layout,
         handleAnnotationChange,
@@ -243,6 +247,7 @@ function ErdCanvasInner({
         ...node,
         ...(selectedIds.has(node.id) ? { selected: true } : {}),
       }));
+      return preserveFlowNodeMeasurements(current, nextNodes);
     });
   }, [
     handleAnnotationChange,
@@ -318,12 +323,17 @@ function ErdCanvasInner({
   }, [clearFkFocus, handleSchemaExplorerClose, schemaExplorerOpen]);
 
   const handleNodeDragStart: OnNodeDrag<TableFlowNode> = useCallback((_, node, draggedNodes) => {
+    setMiniMapSnapshot(captureMiniMapSnapshot(canvasRef.current));
     setFkDragSession(startFkDragSession(nodes, node, draggedNodes));
   }, [nodes]);
 
-  const handleNodeDragStop: OnNodeDrag<TableFlowNode> = useCallback((_, node) => {
+  const handleNodeDragStop: OnNodeDrag<TableFlowNode> = useCallback((_, node, draggedNodes) => {
     setFkDragSession(undefined);
-    emitLayout(updateNodeLayout(latestLayout.current, node.id, node.position));
+    setMiniMapSnapshot(undefined);
+    emitLayout(updateDraggedNodesLayout(
+      latestLayout.current,
+      draggedNodes.length > 0 ? draggedNodes : [node],
+    ));
   }, [emitLayout]);
 
   const handleMoveEnd: OnMove = useCallback((event, viewport) => {
@@ -440,14 +450,9 @@ function ErdCanvasInner({
         />
         <Controls showInteractive={false} />
         {showMiniMap ? (
-          <MiniMapDragSnapshotProvider nodes={fkDragSession?.frozenNodes}>
-            <MiniMap
-              pannable
-              zoomable
-              nodeStrokeWidth={3}
-              nodeComponent={DragStableMiniMapNode}
-            />
-          </MiniMapDragSnapshotProvider>
+          fkDragSession && miniMapSnapshot
+            ? <DragStableMiniMap markup={miniMapSnapshot} />
+            : <MiniMap pannable zoomable nodeStrokeWidth={3} />
         ) : null}
       </ReactFlow>
     </div>

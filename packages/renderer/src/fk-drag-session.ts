@@ -1,4 +1,8 @@
-import type { ErdSchema } from '@dbml-canvas/core';
+import {
+  updateNodeLayout,
+  type ErdLayout,
+  type ErdSchema,
+} from '@dbml-canvas/core';
 import type { TableFlowNode } from './graph.js';
 
 export interface FkDragSession {
@@ -28,4 +32,32 @@ export function reconcileFkDragSession(
   return [...session.movedNodeIds].every((nodeId) => tableIds.has(nodeId))
     ? session
     : undefined;
+}
+
+export function updateDraggedNodesLayout(
+  layout: ErdLayout,
+  draggedNodes: readonly TableFlowNode[],
+): ErdLayout {
+  return draggedNodes.reduce(
+    (current, node) => updateNodeLayout(current, node.id, node.position),
+    layout,
+  );
+}
+
+export function preserveFlowNodeMeasurements(
+  currentNodes: readonly TableFlowNode[],
+  nextNodes: TableFlowNode[],
+): TableFlowNode[] {
+  const currentById = new Map(currentNodes.map((node) => [node.id, node]));
+  return nextNodes.map((node) => {
+    const current = currentById.get(node.id);
+    if (!current || current.data.table !== node.data.table) return node;
+
+    return {
+      ...node,
+      ...(current.measured ? { measured: current.measured } : {}),
+      ...(current.width !== undefined ? { width: current.width } : {}),
+      ...(current.height !== undefined ? { height: current.height } : {}),
+    };
+  });
 }

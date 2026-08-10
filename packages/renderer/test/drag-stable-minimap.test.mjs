@@ -4,78 +4,50 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const miniMapModule = await import('../dist/DragStableMiniMapNode.js').catch(() => ({}));
+const miniMapModule = await import('../dist/DragStableMiniMap.js').catch(() => ({}));
 
-const liveProps = {
-  id: 'public.orders',
-  x: 420,
-  y: 90,
-  width: 340,
-  height: 160,
-  borderRadius: 5,
-  className: '',
-  color: '#dde3ea',
-  shapeRendering: 'crispEdges',
-  selected: false,
-};
+test('captures the complete live MiniMap SVG before a drag starts', () => {
+  assert.equal(typeof miniMapModule.captureMiniMapSnapshot, 'function');
 
-const frozenNodes = [{
-  id: 'public.orders',
-  type: 'table',
-  position: { x: 80, y: 90 },
-  measured: { width: 340, height: 160 },
-  data: {},
-}];
+  const markup = '<svg class="react-flow__minimap" viewBox="0 0 900 500"><rect x="80"/></svg>';
+  const root = {
+    querySelector(selector) {
+      assert.equal(selector, '.react-flow__minimap');
+      return { outerHTML: markup };
+    },
+  };
 
-test('MiniMap drag snapshot resolves frozen and live node rectangles', () => {
-  assert.equal(typeof miniMapModule.createMiniMapNodeSnapshot, 'function');
-  assert.equal(typeof miniMapModule.getMiniMapNodeRect, 'function');
-
-  const snapshot = miniMapModule.createMiniMapNodeSnapshot(frozenNodes);
-  assert.deepEqual(miniMapModule.getMiniMapNodeRect(liveProps, undefined), {
-    x: 420,
-    y: 90,
-    width: 340,
-    height: 160,
-  });
-  assert.deepEqual(miniMapModule.getMiniMapNodeRect(liveProps, snapshot), {
-    x: 80,
-    y: 90,
-    width: 340,
-    height: 160,
-  });
+  assert.equal(miniMapModule.captureMiniMapSnapshot(root), markup);
+  assert.equal(miniMapModule.captureMiniMapSnapshot(null), undefined);
   assert.equal(
-    miniMapModule.getMiniMapNodeRect({ ...liveProps, x: 500 }, snapshot),
-    miniMapModule.getMiniMapNodeRect(liveProps, snapshot),
+    miniMapModule.captureMiniMapSnapshot({ querySelector: () => null }),
+    undefined,
   );
 });
 
-test('MiniMap drag snapshot keeps the SVG node visible and releases final geometry', () => {
-  assert.equal(typeof miniMapModule.MiniMapDragSnapshotProvider, 'function');
-  assert.equal(typeof miniMapModule.DragStableMiniMapNode, 'object');
+test('renders one inert MiniMap snapshot with its frozen viewBox and coordinates', () => {
+  assert.equal(typeof miniMapModule.DragStableMiniMap, 'function');
 
-  const frozenMarkup = renderToStaticMarkup(createElement(
-    miniMapModule.MiniMapDragSnapshotProvider,
-    { nodes: frozenNodes },
-    createElement(miniMapModule.DragStableMiniMapNode, liveProps),
-  ));
-  const liveMarkup = renderToStaticMarkup(createElement(
-    miniMapModule.MiniMapDragSnapshotProvider,
-    {},
-    createElement(miniMapModule.DragStableMiniMapNode, liveProps),
+  const markup = '<svg class="react-flow__minimap" viewBox="0 0 900 500"><rect x="80"/></svg>';
+  const rendered = renderToStaticMarkup(createElement(
+    miniMapModule.DragStableMiniMap,
+    { markup },
   ));
 
-  assert.match(frozenMarkup, /class="react-flow__minimap-node"/);
-  assert.match(frozenMarkup, /x="80"/);
-  assert.match(frozenMarkup, /y="90"/);
-  assert.match(liveMarkup, /x="420"/);
+  assert.match(rendered, /class="dbml-minimap-drag-snapshot"/);
+  assert.match(rendered, /viewBox="0 0 900 500"/);
+  assert.match(rendered, /x="80"/);
+  assert.match(rendered, /aria-hidden="true"/);
 });
 
-test('ErdCanvas keeps the existing MiniMap mounted with the drag-stable node renderer', async () => {
+test('ErdCanvas swaps the live MiniMap for the complete snapshot only during a drag', async () => {
   const source = await readFile(new URL('../src/ErdCanvas.tsx', import.meta.url), 'utf8');
 
-  assert.match(source, /<MiniMapDragSnapshotProvider nodes=\{fkDragSession\?\.frozenNodes\}>/);
-  assert.match(source, /nodeComponent=\{DragStableMiniMapNode\}/);
-  assert.match(source, /<MiniMap\s/);
-  assert.doesNotMatch(source, /fkDragSession \? null : <MiniMap/);
+  assert.match(source, /captureMiniMapSnapshot\(canvasRef\.current\)/);
+  assert.match(source, /const \[miniMapSnapshot, setMiniMapSnapshot\]/);
+  assert.match(source, /fkDragSession && miniMapSnapshot/);
+  assert.match(source, /<DragStableMiniMap markup=\{miniMapSnapshot\}/);
+  assert.match(source, /<MiniMap pannable zoomable nodeStrokeWidth=\{3\} \/>/);
+  assert.doesNotMatch(source, /nodeComponent=/);
+  assert.doesNotMatch(source, /MiniMapDragSnapshotProvider/);
 });

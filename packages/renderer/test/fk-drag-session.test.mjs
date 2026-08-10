@@ -50,11 +50,64 @@ test('FK drag session is cancelled when a moved table disappears', () => {
   assert.equal(dragModule.reconcileFkDragSession(undefined, completeSchema), undefined);
 });
 
+test('FK drag stop persists every dragged node in one layout update', () => {
+  assert.equal(typeof dragModule.updateDraggedNodesLayout, 'function');
+
+  const layout = {
+    version: 1,
+    nodes: {
+      'public.orders': { x: 0, y: 0, color: 'blue' },
+      'public.users': { x: 500, y: 0 },
+    },
+  };
+  const draggedNodes = [
+    { ...node('public.orders'), position: { x: 120, y: 80 } },
+    { ...node('public.users'), position: { x: 640, y: 120 } },
+  ];
+  const updated = dragModule.updateDraggedNodesLayout(layout, draggedNodes);
+
+  assert.deepEqual(updated.nodes['public.orders'], { x: 120, y: 80, color: 'blue' });
+  assert.deepEqual(updated.nodes['public.users'], { x: 640, y: 120 });
+  assert.equal(layout.nodes['public.orders'].x, 0);
+});
+
+test('layout feedback preserves measurements only for unchanged schema tables', () => {
+  assert.equal(typeof dragModule.preserveFlowNodeMeasurements, 'function');
+
+  const table = { id: 'public.orders' };
+  const current = [{
+    ...node('public.orders'),
+    measured: { width: 340, height: 160 },
+    width: 340,
+    height: 160,
+    data: { table },
+  }];
+  const sameSchema = [{
+    ...node('public.orders', 240),
+    data: { table },
+  }];
+  const replacedSchema = [{
+    ...node('public.orders', 240),
+    data: { table: { id: 'public.orders' } },
+  }];
+
+  const preserved = dragModule.preserveFlowNodeMeasurements(current, sameSchema);
+  assert.deepEqual(preserved[0].measured, { width: 340, height: 160 });
+  assert.equal(preserved[0].width, 340);
+  assert.deepEqual(preserved[0].position, { x: 240, y: 0 });
+
+  const reset = dragModule.preserveFlowNodeMeasurements(current, replacedSchema);
+  assert.equal(reset[0].measured, undefined);
+  assert.equal(reset[0].width, undefined);
+});
+
 test('ErdCanvas selectively updates edges only while an FK drag session is active', async () => {
   const source = await readFile(new URL('../src/ErdCanvas.tsx', import.meta.url), 'utf8');
 
   assert.match(source, /const \[fkDragSession, setFkDragSession\]/);
   assert.match(source, /startFkDragSession\(nodes, node, draggedNodes\)/);
+  assert.match(source, /updateDraggedNodesLayout\(/);
+  assert.match(source, /preserveFlowNodeMeasurements\(current, nextNodes\)/);
   assert.match(source, /updateFlowEdgesDuringDrag\(/);
   assert.match(source, /fkDragSession\.movedNodeIds/);
   assert.match(source, /onNodeDragStart=\{handleNodeDragStart\}/);
