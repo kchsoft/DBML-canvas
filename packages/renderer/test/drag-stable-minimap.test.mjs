@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -40,14 +39,31 @@ test('renders one inert MiniMap snapshot with its frozen viewBox and coordinates
   assert.match(rendered, /aria-hidden="true"/);
 });
 
-test('ErdCanvas swaps the live MiniMap for the complete snapshot only during a drag', async () => {
-  const source = await readFile(new URL('../src/ErdCanvas.tsx', import.meta.url), 'utf8');
+test('freezes the MiniMap once for a wheel pan and releases it at pan end', () => {
+  assert.equal(typeof miniMapModule.updateViewportMiniMapSnapshot, 'function');
 
-  assert.match(source, /captureMiniMapSnapshot\(canvasRef\.current\)/);
-  assert.match(source, /const \[miniMapSnapshot, setMiniMapSnapshot\]/);
-  assert.match(source, /fkDragSession && miniMapSnapshot/);
-  assert.match(source, /<DragStableMiniMap markup=\{miniMapSnapshot\}/);
-  assert.match(source, /<MiniMap pannable zoomable nodeStrokeWidth=\{3\} \/>/);
-  assert.doesNotMatch(source, /nodeComponent=/);
-  assert.doesNotMatch(source, /MiniMapDragSnapshotProvider/);
+  const captured = '<svg class="react-flow__minimap"><rect x="80"/></svg>';
+
+  const started = miniMapModule.updateViewportMiniMapSnapshot(
+    undefined,
+    'wheel',
+    'start',
+    captured,
+  );
+  const repeated = miniMapModule.updateViewportMiniMapSnapshot(
+    started,
+    'wheel',
+    'start',
+    '<svg class="react-flow__minimap"><rect x="160"/></svg>',
+  );
+  const endedWithoutEvent = miniMapModule.updateViewportMiniMapSnapshot(
+    repeated,
+    undefined,
+    'end',
+    undefined,
+  );
+
+  assert.equal(started, captured);
+  assert.equal(repeated, started);
+  assert.equal(endedWithoutEvent, undefined);
 });
