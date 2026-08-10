@@ -30,13 +30,27 @@ export function normalizeSchemaQuery(query: string): string {
 
 export function findTextMatchRanges(value: string, normalizedQuery: string): TextMatchRange[] {
   if (!normalizedQuery) return [];
+  const originalStarts: number[] = [];
+  const originalEnds: number[] = [];
+  let originalIndex = 0;
+  for (const character of value) {
+    const normalizedCharacter = character.toLowerCase();
+    for (let index = 0; index < normalizedCharacter.length; index += 1) {
+      originalStarts.push(originalIndex);
+      originalEnds.push(originalIndex + character.length);
+    }
+    originalIndex += character.length;
+  }
   const normalizedValue = value.toLowerCase();
   const ranges: TextMatchRange[] = [];
   let from = 0;
   while (from <= normalizedValue.length - normalizedQuery.length) {
     const start = normalizedValue.indexOf(normalizedQuery, from);
     if (start < 0) break;
-    ranges.push({ start, end: start + normalizedQuery.length });
+    ranges.push({
+      start: originalStarts[start]!,
+      end: originalEnds[start + normalizedQuery.length - 1]!,
+    });
     from = start + normalizedQuery.length;
   }
   return ranges;

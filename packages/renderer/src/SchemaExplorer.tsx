@@ -10,13 +10,15 @@ import {
 
 export interface SchemaExplorerProps {
   schema: ErdSchema;
+  open: boolean;
   selection?: SchemaSearchSelection;
+  onOpenChange: (open: boolean) => void;
   onSelectTable: (tableId: string) => void;
   onSelectColumn: (tableId: string, columnId: string) => void;
   onClose: () => void;
 }
 
-export interface SchemaExplorerPanelProps extends SchemaExplorerProps {
+export interface SchemaExplorerPanelProps extends Omit<SchemaExplorerProps, 'open' | 'onOpenChange'> {
   query: string;
   sortDirection: SchemaSortDirection;
   expandedTableIds: ReadonlySet<string>;
@@ -26,14 +28,43 @@ export interface SchemaExplorerPanelProps extends SchemaExplorerProps {
   onToggleTable: (tableId: string) => void;
 }
 
+interface SchemaExplorerEscapeEvent {
+  key: string;
+  defaultPrevented: boolean;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}
+
+export function handleSchemaExplorerEscape(
+  event: SchemaExplorerEscapeEvent,
+  explorerOpen: boolean,
+  onClose: () => void,
+  onClearFkFocus: () => void,
+): 'close-explorer' | 'clear-fk-focus' | 'ignore' {
+  if (event.key !== 'Escape' || event.defaultPrevented) return 'ignore';
+  if (explorerOpen) {
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
+    return 'close-explorer';
+  }
+  onClearFkFocus();
+  return 'clear-fk-focus';
+}
+
+export function getSchemaExplorerTablePanelId(tableId: string): string {
+  return `dbml-schema-explorer-table-${encodeURIComponent(tableId)}`;
+}
+
 export function SchemaExplorer({
   schema,
+  open,
   selection,
+  onOpenChange,
   onSelectTable,
   onSelectColumn,
   onClose,
 }: SchemaExplorerProps) {
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [sortDirection, setSortDirection] = useState<SchemaSortDirection>('asc');
   const [expandedTableIds, setExpandedTableIds] = useState<Set<string>>(new Set());
@@ -44,11 +75,15 @@ export function SchemaExplorer({
   }, [schema]);
 
   useEffect(() => {
-    if (open) searchInputRef.current?.focus();
+    if (open) {
+      searchInputRef.current?.focus();
+    } else {
+      setQuery('');
+    }
   }, [open]);
 
   const close = () => {
-    setOpen(false);
+    onOpenChange(false);
     setQuery('');
     onClose();
   };
@@ -58,7 +93,7 @@ export function SchemaExplorer({
       close();
       return;
     }
-    setOpen(true);
+    onOpenChange(true);
   };
 
   return (
@@ -123,7 +158,7 @@ export function SchemaExplorerPanel({
   const sortAction = sortDirection === 'asc' ? 'Sort tables descending' : 'Sort tables ascending';
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape' && !event.defaultPrevented) onClose();
+    handleSchemaExplorerEscape(event, true, onClose, () => {});
   };
 
   return (
@@ -153,7 +188,7 @@ export function SchemaExplorerPanel({
         <ul className="dbml-schema-explorer-results">
           {results.map(({ table, tableMatchRanges, columns }) => {
             const expanded = displayExpandedTableIds.has(table.id);
-            const tablePanelId = `dbml-schema-explorer-table-${table.id}`;
+            const tablePanelId = getSchemaExplorerTablePanelId(table.id);
             const selectedTable = selection?.kind === 'table' && selection.tableId === table.id;
             return (
               <li key={table.id} className="dbml-schema-explorer-table">

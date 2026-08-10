@@ -16,6 +16,7 @@
   --dbml-red: #c64b55;
   --dbml-purple: #7655bd;
   --dbml-search: #c87912;
+  --dbml-search-mark-text: #7a4300;
   --dbml-search-soft: #fff1cf;
   --dbml-search-border: #e0a13d;
 }
@@ -36,6 +37,7 @@
   --dbml-red: #c6535e;
   --dbml-purple: #7b5cc4;
   --dbml-search: #f0ad4e;
+  --dbml-search-mark-text: #f0ad4e;
   --dbml-search-soft: #49351a;
   --dbml-search-border: #b97922;
 }
@@ -281,7 +283,7 @@
   border-radius: 2px;
   background: var(--dbml-search-soft);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--dbml-search-border) 38%, transparent);
-  color: var(--dbml-search);
+  color: var(--dbml-search-mark-text);
   font-weight: inherit;
 }
 

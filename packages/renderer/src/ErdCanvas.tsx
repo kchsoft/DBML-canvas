@@ -56,13 +56,15 @@ import {
   type FkRoutingMode,
 } from './fk-routing.js';
 import { TableNode } from './TableNode.js';
-import { SchemaExplorer } from './SchemaExplorer.js';
+import { handleSchemaExplorerEscape, SchemaExplorer } from './SchemaExplorer.js';
 import {
   reconcileSchemaSearchSelection,
   type SchemaSearchSelection,
 } from './schema-explorer.js';
 import {
+  cancelSchemaNavigation,
   isSchemaNavigationLayoutSuppressed,
+  markSchemaNavigationMoveStart,
   navigateToSchemaTable,
   runWithSchemaNavigationSuppression,
 } from './schema-navigation.js';
@@ -140,10 +142,11 @@ function ErdCanvasInner({
   showMiniMap = true,
 }: ErdCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const { fitView, getViewport, setViewport } = useReactFlow<TableFlowNode>();
+  const { getInternalNode, getViewport, setViewport } = useReactFlow<TableFlowNode>();
   const latestLayout = useRef(layout);
   const [fkFocus, setFkFocus] = useState<FkFocus>();
   const [searchSelection, setSearchSelection] = useState<SchemaSearchSelection>();
+  const [schemaExplorerOpen, setSchemaExplorerOpen] = useState(false);
   const searchNavigationRef = useRef(0);
   const fkPresentation = useMemo(
     () => deriveFkFocusPresentation(schema, reconcileFkFocus(schema, fkFocus)),
@@ -194,6 +197,7 @@ function ErdCanvasInner({
   const [routingMode, setRoutingMode] = useState<FkRoutingMode>('settled');
 
   useEffect(() => {
+    cancelSchemaNavigation(searchNavigationRef);
     setFkFocus((current) => transitionFkFocus(schema, current, { type: 'schema' }));
     setSearchSelection((current) => reconcileSchemaSearchSelection(schema, current));
   }, [schema]);
@@ -264,9 +268,19 @@ function ErdCanvasInner({
     setFkFocus((current) => transitionFkFocus(schema, current, { type: 'clear' }));
   }, [schema]);
 
+  const handleSchemaExplorerClose = useCallback(() => {
+    setSchemaExplorerOpen(false);
+    setSearchSelection(undefined);
+  }, []);
+
   const handleCanvasKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape' && !event.defaultPrevented) clearFkFocus();
-  }, [clearFkFocus]);
+    handleSchemaExplorerEscape(
+      event,
+      schemaExplorerOpen,
+      handleSchemaExplorerClose,
+      clearFkFocus,
+    );
+  }, [clearFkFocus, handleSchemaExplorerClose, schemaExplorerOpen]);
 
   const handleNodeDragStart: OnNodeDrag<TableFlowNode> = useCallback(() => {
     setRoutingMode((current) => transitionFkRoutingMode(current, 'drag-start'));
@@ -277,10 +291,14 @@ function ErdCanvasInner({
     emitLayout(updateNodeLayout(latestLayout.current, node.id, node.position));
   }, [emitLayout]);
 
-  const handleMoveEnd: OnMove = useCallback((_, viewport) => {
-    if (isSchemaNavigationLayoutSuppressed(searchNavigationRef)) return;
+  const handleMoveEnd: OnMove = useCallback((event, viewport) => {
+    if (isSchemaNavigationLayoutSuppressed(searchNavigationRef, event, viewport)) return;
     emitLayout(updateViewport(latestLayout.current, viewport));
   }, [emitLayout]);
+
+  const handleMoveStart: OnMove = useCallback((event, viewport) => {
+    markSchemaNavigationMoveStart(searchNavigationRef, event, viewport);
+  }, []);
 
   const navigateToSearchTable = useCallback(async (tableId: string) => {
     const drawerWidth = Math.max(
@@ -289,9 +307,17 @@ function ErdCanvasInner({
     );
     await runWithSchemaNavigationSuppression(
       searchNavigationRef,
-      () => navigateToSchemaTable(tableId, drawerWidth, { fitView, getViewport, setViewport }),
+      () => navigateToSchemaTable(
+        tableId,
+        drawerWidth,
+        {
+          width: canvasRef.current?.clientWidth ?? 384,
+          height: canvasRef.current?.clientHeight ?? 320,
+        },
+        { getInternalNode, setViewport },
+      ),
     );
-  }, [fitView, getViewport, setViewport]);
+  }, [getInternalNode, setViewport]);
 
   const handleSchemaTableSelect = useCallback((tableId: string) => {
     setSearchSelection({ kind: 'table', tableId });
@@ -302,10 +328,6 @@ function ErdCanvasInner({
     setSearchSelection({ kind: 'column', tableId, columnId });
     void navigateToSearchTable(tableId);
   }, [navigateToSearchTable]);
-
-  const handleSchemaExplorerClose = useCallback(() => {
-    setSearchSelection(undefined);
-  }, []);
 
   const handleNodeDoubleClick: NodeMouseHandler<TableFlowNode> = useCallback((_, node) => {
     const source = node.data.table.source;
@@ -358,6 +380,7 @@ function ErdCanvasInner({
         onPaneClick={clearFkFocus}
         onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
+        onMoveStart={handleMoveStart}
         onMoveEnd={handleMoveEnd}
         onNodeDoubleClick={handleNodeDoubleClick}
         {...(layout.viewport ? { defaultViewport: layout.viewport } : {})}
@@ -373,7 +396,9 @@ function ErdCanvasInner({
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <SchemaExplorer
           schema={schema}
+          open={schemaExplorerOpen}
           {...(searchSelection ? { selection: searchSelection } : {})}
+          onOpenChange={setSchemaExplorerOpen}
           onSelectTable={handleSchemaTableSelect}
           onSelectColumn={handleSchemaColumnSelect}
           onClose={handleSchemaExplorerClose}

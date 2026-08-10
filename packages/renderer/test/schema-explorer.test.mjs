@@ -47,6 +47,8 @@ test('normalizes whitespace and matches every case-insensitive substring', () =>
     { start: 11, end: 15 },
   ]);
   assert.deepEqual(findTextMatchRanges('고객이름', '이름'), [{ start: 2, end: 4 }]);
+  assert.deepEqual(findTextMatchRanges('İD', 'd'), [{ start: 1, end: 2 }]);
+  assert.deepEqual(findTextMatchRanges('ΟΣ', 'ς'), [{ start: 1, end: 2 }]);
 });
 
 test('returns all tables sorted ascending or descending for an empty query', () => {

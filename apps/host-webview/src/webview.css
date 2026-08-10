@@ -5,8 +5,8 @@ body { background: var(--dbml-bg); color: var(--dbml-text); font-family: ui-sans
 .host-theme-toggle {
   position: absolute;
   z-index: 10;
-  top: 10px;
-  right: 10px;
+  top: 60px;
+  left: 10px;
   display: grid;
   width: 34px;
   height: 34px;
