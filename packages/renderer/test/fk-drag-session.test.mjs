@@ -29,6 +29,53 @@ test('FK drag session captures moved node ids and the frozen node snapshot', () 
   assert.deepEqual([...fallback.movedNodeIds], ['public.orders']);
 });
 
+test('FK routing snapshot changes only at drag boundaries', () => {
+  assert.equal(typeof dragModule.updateFkRoutingSnapshot, 'function');
+
+  const initialNodes = [node('public.orders'), node('public.users', 500)];
+  const settled = dragModule.updateFkRoutingSnapshot(
+    undefined,
+    initialNodes,
+    undefined,
+  );
+  const session = dragModule.startFkDragSession(
+    initialNodes,
+    initialNodes[0],
+    [initialNodes[0]],
+  );
+  const started = dragModule.updateFkRoutingSnapshot(settled, initialNodes, session);
+  const movedNodes = [
+    { ...initialNodes[0], position: { x: 240, y: 40 } },
+    initialNodes[1],
+  ];
+  const pointerFrame = dragModule.updateFkRoutingSnapshot(started, movedNodes, session);
+  const stopped = dragModule.updateFkRoutingSnapshot(pointerFrame, movedNodes, undefined);
+
+  assert.notEqual(started, settled);
+  assert.equal(started.nodes, initialNodes);
+  assert.equal(pointerFrame, started);
+  assert.notEqual(stopped, pointerFrame);
+  assert.equal(stopped.nodes, movedNodes);
+  assert.equal(stopped.dragSession, undefined);
+
+  const presentationOnlyNodes = initialNodes.map((flowNode) => ({
+    ...flowNode,
+    selected: !flowNode.selected,
+  }));
+  assert.equal(
+    dragModule.updateFkRoutingSnapshot(settled, presentationOnlyNodes, undefined),
+    settled,
+  );
+
+  const measuredNodes = initialNodes.map((flowNode) => ({
+    ...flowNode,
+    measured: { width: 340, height: 160 },
+  }));
+  const measured = dragModule.updateFkRoutingSnapshot(settled, measuredNodes, undefined);
+  assert.notEqual(measured, settled);
+  assert.equal(measured.nodes, measuredNodes);
+});
+
 test('FK drag session is cancelled when a moved table disappears', () => {
   assert.equal(typeof dragModule.reconcileFkDragSession, 'function');
 
