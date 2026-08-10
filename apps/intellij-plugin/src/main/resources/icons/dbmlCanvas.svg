@@ -1,0 +1,11 @@
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#D3D7DE" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- outer table -->
+    <rect x="3" y="3" width="14" height="14" rx="1.8"/>
+    <!-- header -->
+    <path d="M3 7H17"/>
+    <!-- rows -->
+    <path d="M6 10H13.5"/>
+    <path d="M6 13H11.5"/>
+  </g>
+</svg>
