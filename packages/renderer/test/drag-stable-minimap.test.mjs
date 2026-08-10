@@ -39,31 +39,11 @@ test('renders one inert MiniMap snapshot with its frozen viewBox and coordinates
   assert.match(rendered, /aria-hidden="true"/);
 });
 
-test('freezes the MiniMap once for a wheel pan and releases it at pan end', () => {
-  assert.equal(typeof miniMapModule.updateViewportMiniMapSnapshot, 'function');
-
-  const captured = '<svg class="react-flow__minimap"><rect x="80"/></svg>';
-
-  const started = miniMapModule.updateViewportMiniMapSnapshot(
-    undefined,
-    'wheel',
-    'start',
-    captured,
-  );
-  const repeated = miniMapModule.updateViewportMiniMapSnapshot(
-    started,
-    'wheel',
-    'start',
-    '<svg class="react-flow__minimap"><rect x="160"/></svg>',
-  );
-  const endedWithoutEvent = miniMapModule.updateViewportMiniMapSnapshot(
-    repeated,
-    undefined,
-    'end',
-    undefined,
-  );
-
-  assert.equal(started, captured);
-  assert.equal(repeated, started);
-  assert.equal(endedWithoutEvent, undefined);
+// React Flow already memoizes every MiniMap node against viewport changes: MiniMapNodes
+// subscribes to the node id list with `shallow`, and each node wrapper subscribes only to its
+// own position. Panning re-renders nothing but the mask rect, so freezing the MiniMap for a
+// pan buys nothing and costs a full unmount/remount of it on every wheel gesture.
+test('exposes no viewport freeze helper, so panning keeps the live MiniMap', () => {
+  assert.equal(miniMapModule.updateViewportMiniMapSnapshot, undefined);
+  assert.equal(typeof miniMapModule.captureMiniMapSnapshot, 'function');
 });

@@ -36,7 +36,6 @@ import { FkEdge } from './FkEdge.js';
 import {
   captureMiniMapSnapshot,
   DragStableMiniMap,
-  updateViewportMiniMapSnapshot,
 } from './DragStableMiniMap.js';
 import {
   deriveFkFocusPresentation,
@@ -198,12 +197,10 @@ function ErdCanvasInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState<FkFlowEdge>(initialFlow.edges);
   const [fkDragSession, setFkDragSession] = useState<FkDragSession>();
   const [miniMapSnapshot, setMiniMapSnapshot] = useState<string>();
-  const [viewportMiniMapSnapshot, setViewportMiniMapSnapshot] = useState<string>();
 
   useEffect(() => {
     cancelSchemaNavigation(searchNavigationRef);
     setMiniMapSnapshot(undefined);
-    setViewportMiniMapSnapshot(undefined);
     setFkDragSession((current) => reconcileFkDragSession(current, schema));
     setFkFocus((current) => transitionFkFocus(schema, current, { type: 'schema' }));
     setSearchSelection((current) => reconcileSchemaSearchSelection(schema, current));
@@ -223,7 +220,6 @@ function ErdCanvasInner({
   useEffect(() => {
     setFkDragSession(undefined);
     setMiniMapSnapshot(undefined);
-    setViewportMiniMapSnapshot(undefined);
     setNodes((current) => {
       const selectedIds = new Set(current.filter((node) => node.selected).map((node) => node.id));
       const nextNodes = createFlowNodes(
@@ -330,26 +326,11 @@ function ErdCanvasInner({
   }, [emitLayout]);
 
   const handleMoveEnd: OnMove = useCallback((event, viewport) => {
-    setViewportMiniMapSnapshot((current) => updateViewportMiniMapSnapshot(
-      current,
-      event?.type,
-      'end',
-      undefined,
-    ));
     if (isSchemaNavigationLayoutSuppressed(searchNavigationRef, event, viewport)) return;
     emitLayout(updateViewport(latestLayout.current, viewport));
   }, [emitLayout]);
 
   const handleMoveStart: OnMove = useCallback((event, viewport) => {
-    const capturedMiniMap = event?.type === 'wheel'
-      ? captureMiniMapSnapshot(canvasRef.current)
-      : undefined;
-    setViewportMiniMapSnapshot((current) => updateViewportMiniMapSnapshot(
-      current,
-      event?.type,
-      'start',
-      capturedMiniMap,
-    ));
     markSchemaNavigationMoveStart(searchNavigationRef, event, viewport);
   }, []);
 
@@ -415,10 +396,6 @@ function ErdCanvasInner({
     return () => canvas.removeEventListener('wheel', handleControlWheel, { capture: true });
   }, [getViewport, setViewport]);
 
-  const stableMiniMapSnapshot = fkDragSession && miniMapSnapshot
-    ? miniMapSnapshot
-    : viewportMiniMapSnapshot;
-
   return (
     <div
       ref={canvasRef}
@@ -462,8 +439,8 @@ function ErdCanvasInner({
         />
         <Controls showInteractive={false} />
         {showMiniMap ? (
-          stableMiniMapSnapshot
-            ? <DragStableMiniMap markup={stableMiniMapSnapshot} />
+          fkDragSession && miniMapSnapshot
+            ? <DragStableMiniMap markup={miniMapSnapshot} />
             : <MiniMap pannable zoomable nodeStrokeWidth={3} />
         ) : null}
       </ReactFlow>
