@@ -61,7 +61,11 @@ import {
   reconcileSchemaSearchSelection,
   type SchemaSearchSelection,
 } from './schema-explorer.js';
-import { navigateToSchemaTable } from './schema-navigation.js';
+import {
+  isSchemaNavigationLayoutSuppressed,
+  navigateToSchemaTable,
+  runWithSchemaNavigationSuppression,
+} from './schema-navigation.js';
 import {
   CONTROL_WHEEL_ZOOM_SENSITIVITY,
   calculateWheelZoomViewport,
@@ -274,7 +278,7 @@ function ErdCanvasInner({
   }, [emitLayout]);
 
   const handleMoveEnd: OnMove = useCallback((_, viewport) => {
-    if (searchNavigationRef.current > 0) return;
+    if (isSchemaNavigationLayoutSuppressed(searchNavigationRef)) return;
     emitLayout(updateViewport(latestLayout.current, viewport));
   }, [emitLayout]);
 
@@ -283,12 +287,10 @@ function ErdCanvasInner({
       0,
       Math.min(320, (canvasRef.current?.clientWidth ?? 384) - 64),
     );
-    searchNavigationRef.current += 1;
-    try {
-      await navigateToSchemaTable(tableId, drawerWidth, { fitView, getViewport, setViewport });
-    } finally {
-      searchNavigationRef.current -= 1;
-    }
+    await runWithSchemaNavigationSuppression(
+      searchNavigationRef,
+      () => navigateToSchemaTable(tableId, drawerWidth, { fitView, getViewport, setViewport }),
+    );
   }, [fitView, getViewport, setViewport]);
 
   const handleSchemaTableSelect = useCallback((tableId: string) => {

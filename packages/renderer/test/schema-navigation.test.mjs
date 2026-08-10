@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { navigateToSchemaTable } from '../dist/schema-navigation.js';
+import * as schemaNavigation from '../dist/schema-navigation.js';
+
+const {
+  isSchemaNavigationLayoutSuppressed,
+  navigateToSchemaTable,
+  runWithSchemaNavigationSuppression,
+} = schemaNavigation;
 
 test('fits one table then shifts it left by half the visible drawer width', async () => {
   const calls = [];
@@ -31,4 +37,33 @@ test('does not shift the viewport when fitting the table fails', async () => {
   await navigateToSchemaTable('public.accounts', 320, api);
 
   assert.equal(setViewportCalled, false);
+});
+
+test('keeps ErdCanvas layout changes suppressed through React Flow deferred move end', async () => {
+  const activity = { current: 0 };
+  let layoutChanges = 0;
+  const onLayoutChange = () => {
+    layoutChanges += 1;
+  };
+  const handleMoveEnd = () => {
+    if (isSchemaNavigationLayoutSuppressed(activity)) return;
+    onLayoutChange();
+  };
+  const api = {
+    fitView: async () => true,
+    getViewport: () => ({ x: 40, y: 20, zoom: 1.1 }),
+    setViewport: async () => {
+      setTimeout(handleMoveEnd, 0);
+      return true;
+    },
+  };
+
+  await runWithSchemaNavigationSuppression(
+    activity,
+    () => navigateToSchemaTable('public.accounts', 320, api),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(layoutChanges, 0);
+  assert.equal(activity.current, 0);
 });
