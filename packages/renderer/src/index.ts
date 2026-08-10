@@ -6,5 +6,6 @@ export * from './fk-routing.js';
 export * from './graph.js';
 export * from './schema-details.js';
 export * from './schema-explorer.js';
+export * from './SchemaExplorer.js';
 export * from './TableColorSettings.js';
 export * from './TableNode.js';
