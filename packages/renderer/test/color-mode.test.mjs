@@ -72,5 +72,6 @@ test('creates the initial FK graph in settled routing mode', () => {
   assert.deepEqual(state.edges[0].data, {
     routingMode: 'settled',
     selfReference: false,
+    focusState: 'idle',
   });
 });

@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { FkFocusState } from './fk-focus.js';
 
 export type FkRoutingMode = 'adaptive' | 'settled';
 export type FkRoutingEvent = 'drag-start' | 'drag-stop';
@@ -8,6 +9,7 @@ export type FkHandleRole = 'source' | 'target';
 export interface FkEdgeData extends Record<string, unknown> {
   routingMode: FkRoutingMode;
   selfReference: boolean;
+  focusState: FkFocusState;
 }
 
 export type FkFlowEdge = Edge<FkEdgeData, 'fk'>;

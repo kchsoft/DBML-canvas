@@ -9,6 +9,10 @@ import type {
 import { applyLayout } from '@dbml-canvas/core';
 import type { Node } from '@xyflow/react';
 import {
+  getFkEdgeFocusState,
+  type FkFocusPresentation,
+} from './fk-focus.js';
+import {
   chooseFkHandleSides,
   makeFkHandleId,
   type FkFlowEdge,
@@ -23,6 +27,9 @@ export interface TableNodeData extends Record<string, unknown> {
   layout: NodeLayout;
   onAnnotationChange?: (patch: NodeAnnotationPatch) => void;
   onEditNote?: (target: DbmlNoteTarget, note: string) => Promise<void> | void;
+  activeFkColumnId?: string;
+  relatedFkColumnIds?: readonly string[];
+  onFkColumnFocus?: (columnId: string) => void;
 }
 
 export type TableFlowNode = Node<TableNodeData, 'table'>;
@@ -43,12 +50,18 @@ export function createFlowNodes(
   layout: ErdLayout,
   onAnnotationChange?: TableAnnotationChangeHandler,
   onEditNote?: TableNoteEditHandler,
+  fkPresentation?: FkFocusPresentation,
+  onFkColumnFocus?: (columnId: string) => void,
 ): TableFlowNode[] {
   const positions = applyLayout(schema, layout);
   const details = createSchemaDetails(schema);
   return schema.tables.map((table) => {
     const nodeLayout = positions[table.id] ?? { x: 0, y: 0 };
     const tableDetails = details[table.id];
+    const tableColumnIds = new Set(table.columns.map((column) => column.id));
+    const relatedFkColumnIds = table.columns
+      .map((column) => column.id)
+      .filter((columnId) => fkPresentation?.endpointColumnIds.has(columnId));
     if (!tableDetails) throw new Error(`Missing renderer details for table ${table.id}.`);
     return {
       id: table.id,
@@ -59,6 +72,12 @@ export function createFlowNodes(
         details: tableDetails,
         layout: nodeLayout,
         ...(onEditNote ? { onEditNote } : {}),
+        ...(fkPresentation?.activeColumnId
+          && tableColumnIds.has(fkPresentation.activeColumnId)
+          ? { activeFkColumnId: fkPresentation.activeColumnId }
+          : {}),
+        ...(relatedFkColumnIds.length > 0 ? { relatedFkColumnIds } : {}),
+        ...(onFkColumnFocus ? { onFkColumnFocus } : {}),
         ...(onAnnotationChange
           ? { onAnnotationChange: (patch: NodeAnnotationPatch) => onAnnotationChange(
             table.id,
@@ -75,6 +94,7 @@ export function createFlowEdges(
   schema: ErdSchema,
   nodes: FkGeometryNode[] = [],
   routingMode: FkRoutingMode = 'settled',
+  fkPresentation?: FkFocusPresentation,
 ): FkFlowEdge[] {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
@@ -107,6 +127,9 @@ export function createFlowEdges(
       data: {
         routingMode,
         selfReference: relationship.source.tableId === relationship.target.tableId,
+        focusState: fkPresentation
+          ? getFkEdgeFocusState(fkPresentation, relationship.id)
+          : 'idle',
       },
       label,
       labelStyle: { fontSize: 11 },

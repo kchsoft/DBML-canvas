@@ -5,7 +5,7 @@ import {
   makeFkHandleId,
   transitionFkRoutingMode,
 } from '../dist/fk-routing.js';
-import { createFlowEdges } from '../dist/graph.js';
+import { createFlowEdges, createFlowNodes } from '../dist/graph.js';
 
 const node = (id, x, width = 340) => ({
   id,
@@ -87,6 +87,85 @@ test('creates an FK edge with geometry-selected handles and preserved semantics'
   assert.equal(edge.target, 'public.users');
   assert.equal(edge.sourceHandle, 'source:left:public.orders.user_id');
   assert.equal(edge.targetHandle, 'target:right:public.users.id');
-  assert.deepEqual(edge.data, { routingMode: 'settled', selfReference: false });
+  assert.deepEqual(edge.data, {
+    routingMode: 'settled',
+    selfReference: false,
+    focusState: 'idle',
+  });
   assert.equal(edge.label, '* : 1');
+});
+
+test('carries one focus presentation into table nodes and FK edges', () => {
+  const graphSchema = {
+    version: 1,
+    tables: [
+      {
+        id: 'public.orders',
+        name: 'orders',
+        displayName: 'orders',
+        schemaName: 'public',
+        columns: [
+          { id: 'public.orders.user_id', name: 'user_id', type: 'int' },
+          { id: 'public.orders.team_id', name: 'team_id', type: 'int' },
+        ],
+        indexes: [],
+      },
+      {
+        id: 'public.users',
+        name: 'users',
+        displayName: 'users',
+        schemaName: 'public',
+        columns: [{ id: 'public.users.id', name: 'id', type: 'int' }],
+        indexes: [],
+      },
+      {
+        id: 'public.teams',
+        name: 'teams',
+        displayName: 'teams',
+        schemaName: 'public',
+        columns: [{ id: 'public.teams.id', name: 'id', type: 'int' }],
+        indexes: [],
+      },
+    ],
+    relationships: [
+      schema.relationships[0],
+      {
+        id: 'orders-team',
+        source: {
+          tableId: 'public.orders',
+          columnIds: ['public.orders.team_id'],
+          cardinality: '*',
+        },
+        target: {
+          tableId: 'public.teams',
+          columnIds: ['public.teams.id'],
+          cardinality: '1',
+        },
+      },
+    ],
+    warnings: [],
+  };
+  const presentation = {
+    relationshipIds: new Set(['orders-user']),
+    endpointColumnIds: new Set(['public.orders.user_id', 'public.users.id']),
+    activeColumnId: 'public.orders.user_id',
+  };
+  const onFkColumnFocus = () => {};
+  const nodes = createFlowNodes(
+    graphSchema,
+    { version: 1, nodes: {} },
+    undefined,
+    undefined,
+    presentation,
+    onFkColumnFocus,
+  );
+  const orders = nodes.find(({ id }) => id === 'public.orders');
+
+  assert.equal(orders.data.activeFkColumnId, 'public.orders.user_id');
+  assert.deepEqual(orders.data.relatedFkColumnIds, ['public.orders.user_id']);
+  assert.equal(orders.data.onFkColumnFocus, onFkColumnFocus);
+
+  const edges = createFlowEdges(graphSchema, nodes, 'settled', presentation);
+  assert.equal(edges.find(({ id }) => id === 'orders-user').data.focusState, 'focused');
+  assert.equal(edges.find(({ id }) => id === 'orders-team').data.focusState, 'dimmed');
 });
