@@ -82,6 +82,23 @@ export function DetailsCard({
         </section>
       ) : null}
 
+      {isColumn && detail.enum && detail.enum.values.length > 0 ? (
+        <section className="dbml-details-section">
+          <h4>Allowed values</h4>
+          <ul
+            className="dbml-details-list dbml-enum-values"
+            aria-label={`${detail.enum.name} values`}
+          >
+            {detail.enum.values.map((value) => (
+              <li key={value.name}>
+                <code>{value.name}</code>
+                {value.note ? <span>{value.note}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {isColumn && detail.foreignKeys.length > 0 ? (
         <section className="dbml-details-section">
           <h4>References</h4>

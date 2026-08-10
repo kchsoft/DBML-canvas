@@ -315,6 +315,26 @@
 .dbml-index-list strong { font-size: 11px; }
 .dbml-details-list code { color: var(--dbml-accent); overflow-wrap: anywhere; }
 
+.dbml-enum-values {
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 2px solid color-mix(in srgb, var(--dbml-accent) 45%, transparent);
+}
+
+.dbml-enum-values li {
+  display: grid;
+  grid-template-columns: minmax(84px, max-content) minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  padding-left: 10px;
+}
+
+.dbml-enum-values span {
+  color: var(--dbml-muted);
+  overflow-wrap: anywhere;
+}
+
 .dbml-note-form textarea {
   width: 100%;
   resize: vertical;
