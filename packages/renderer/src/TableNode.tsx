@@ -269,7 +269,7 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
                 onFkColumnFocus?.(column.id);
               }}
               onKeyDown={(event) => {
-                if (!isFkFocusActivationKey(event.key)) return;
+                if (!shouldActivateFkFocus(event.key, event.target, event.currentTarget)) return;
                 event.preventDefault();
                 event.stopPropagation();
                 onFkColumnFocus?.(column.id);
@@ -322,6 +322,14 @@ export function canOpenDetail(detail: ActiveDetail, tableDetailSuppressed: boole
 
 export function isFkFocusActivationKey(key: string): boolean {
   return key === 'Enter' || key === ' ';
+}
+
+export function shouldActivateFkFocus(
+  key: string,
+  target: EventTarget,
+  currentTarget: EventTarget,
+): boolean {
+  return isFkFocusActivationKey(key) && isDirectFocusTarget(target, currentTarget);
 }
 
 function resolveDetail(

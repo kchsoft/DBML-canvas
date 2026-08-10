@@ -7,6 +7,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import {
   canOpenDetail,
   isFkFocusActivationKey,
+  shouldActivateFkFocus,
   TableNode,
 } from '../dist/TableNode.js';
 
@@ -206,4 +207,14 @@ test('renders active and related FK columns with keyboard focus affordances', as
   assert.match(css, /\.dbml-column-row\.is-fk-active\s*\{[^}]*box-shadow:/s);
   assert.match(css, /\.dbml-column-row\.is-fk-related\s*\{[^}]*background:/s);
   assert.match(css, /transition:[^;]*background-color 140ms/s);
+});
+
+test('does not treat keys from a nested column editor as FK focus shortcuts', () => {
+  const row = {};
+  const nestedEditor = {};
+
+  assert.equal(shouldActivateFkFocus('Enter', row, row), true);
+  assert.equal(shouldActivateFkFocus(' ', row, row), true);
+  assert.equal(shouldActivateFkFocus('Enter', nestedEditor, row), false);
+  assert.equal(shouldActivateFkFocus(' ', nestedEditor, row), false);
 });
