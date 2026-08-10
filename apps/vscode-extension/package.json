@@ -23,6 +23,25 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dbmlCanvas",
+          "title": "DBML Canvas",
+          "icon": "resources/dbml-canvas.svg"
+        }
+      ]
+    },
+
+    "views": {
+      "dbmlCanvas": [
+        {
+          "id": "dbmlCanvas.view",
+          "name": "DBML Canvas",
+          "type": "webview"
+        }
+      ]
+    },
     "languages": [
       {
         "id": "dbml",
