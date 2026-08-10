@@ -4,7 +4,7 @@
 
 **Goal:** Eliminate routing-driven FK edge state updates from table-drag pointer frames while retaining live connected paths and one final settled smart-route rebuild.
 
-**Architecture:** A pure drag-session selector exposes the frozen drag-start node array while a session is active and the live measured array otherwise. `ErdCanvas` uses that stable reference as the routing effect dependency, switches connected edges to adaptive mode once at drag start, lets React Flow update their endpoint props during movement, and rebuilds all settled edges once when the session ends.
+**Architecture:** A pure routing lifecycle owns one stable snapshot containing the node geometry and active drag session. The snapshot changes at drag start, remains referentially identical across pointer frames, and changes once at drag stop; `ErdCanvas` makes its edge effect depend on that snapshot. React Flow continues updating connected custom-edge endpoint props, so adaptive paths follow moving nodes without changing the edge array.
 
 **Tech Stack:** TypeScript, React 19, React Flow 12.11.2, Node test runner, npm workspaces, Vite host webview, Gradle IntelliJ plugin packaging.
 
@@ -12,7 +12,7 @@
 
 - Implement only in `@dbml-canvas/renderer`; browser, VS Code, and IntelliJ consume the shared renderer.
 - Do not change DBML parsing, host messages, or layout sidecar version 1.
-- Do not run routing-driven `setEdges` work during pointer-move node updates.
+- Do not run routing-driven `setEdges` work or full-node geometry comparison during pointer-move updates.
 - Keep FK handles fixed during the drag and recalculate them after release.
 - Preserve FK focus, selection, labels, adaptive fallback, multi-node dragging, and the static MiniMap snapshot.
 - Preserve the user's untracked `todo.txt`.
@@ -20,73 +20,124 @@
 
 ---
 
-### Task 1: Stable FK routing input for a drag session
+### Task 1: Model routing as a stable drag lifecycle
 
 **Files:**
 - Modify: `packages/renderer/src/fk-drag-session.ts`
 - Modify: `packages/renderer/test/fk-drag-session.test.mjs`
 
 **Interfaces:**
-- Consumes: `FkDragSession.frozenNodes` and the current `TableFlowNode[]`.
-- Produces: `selectFkRoutingNodes(nodes, session): TableFlowNode[]`.
+- Produces: `FkRoutingSnapshot { nodes: TableFlowNode[]; dragSession?: FkDragSession }`.
+- Produces: `updateFkRoutingSnapshot(current, nodes, dragSession): FkRoutingSnapshot`.
+- Moves: the geometry-equivalence rule from `ErdCanvas` into the lifecycle helper.
 
-- [ ] **Step 1: Write the failing reference-stability test**
+- [ ] **Step 1: Write the failing lifecycle test**
 
-Add this focused behavior to `fk-drag-session.test.mjs`:
+Add a test using real snapshot objects and literal positions. The production
+mutation it catches is returning a new routing snapshot when only live node
+positions change inside the same drag session:
 
 ```js
-test('FK routing nodes stay frozen for an active drag session', () => {
-  assert.equal(typeof dragModule.selectFkRoutingNodes, 'function');
+test('FK routing snapshot changes only at drag boundaries', () => {
+  assert.equal(typeof dragModule.updateFkRoutingSnapshot, 'function');
 
-  const frozenNodes = [node('public.orders'), node('public.users', 500)];
-  const session = dragModule.startFkDragSession(
-    frozenNodes,
-    frozenNodes[0],
-    [frozenNodes[0]],
+  const initialNodes = [node('public.orders'), node('public.users', 500)];
+  const settled = dragModule.updateFkRoutingSnapshot(
+    undefined,
+    initialNodes,
+    undefined,
   );
+  const session = dragModule.startFkDragSession(
+    initialNodes,
+    initialNodes[0],
+    [initialNodes[0]],
+  );
+  const started = dragModule.updateFkRoutingSnapshot(settled, initialNodes, session);
   const movedNodes = [
-    { ...frozenNodes[0], position: { x: 240, y: 40 } },
-    frozenNodes[1],
+    { ...initialNodes[0], position: { x: 240, y: 40 } },
+    initialNodes[1],
   ];
+  const pointerFrame = dragModule.updateFkRoutingSnapshot(started, movedNodes, session);
+  const stopped = dragModule.updateFkRoutingSnapshot(pointerFrame, movedNodes, undefined);
 
-  assert.equal(dragModule.selectFkRoutingNodes(movedNodes, session), frozenNodes);
-  assert.equal(dragModule.selectFkRoutingNodes(movedNodes, undefined), movedNodes);
+  assert.notEqual(started, settled);
+  assert.equal(started.nodes, initialNodes);
+  assert.equal(pointerFrame, started);
+  assert.notEqual(stopped, pointerFrame);
+  assert.equal(stopped.nodes, movedNodes);
+  assert.equal(stopped.dragSession, undefined);
 });
 ```
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
-Run:
-
 ```bash
 rtk npm run build -w @dbml-canvas/renderer
-rtk node --test --test-name-pattern="routing nodes stay frozen" packages/renderer/test/fk-drag-session.test.mjs
+rtk node --test --test-name-pattern="routing snapshot changes only" packages/renderer/test/fk-drag-session.test.mjs
 ```
 
-Expected: FAIL at the `typeof` assertion because `selectFkRoutingNodes` is not
-exported.
+Expected: FAIL at the `typeof` assertion because
+`updateFkRoutingSnapshot` does not exist.
 
-- [ ] **Step 3: Implement the minimal selector**
+- [ ] **Step 3: Add settled-state geometry cases while still RED**
 
-Add to `fk-drag-session.ts`:
+Extend the test with these independently derived cases:
+
+```js
+const presentationOnlyNodes = initialNodes.map((flowNode) => ({
+  ...flowNode,
+  selected: !flowNode.selected,
+}));
+assert.equal(
+  dragModule.updateFkRoutingSnapshot(settled, presentationOnlyNodes, undefined),
+  settled,
+);
+
+const measuredNodes = initialNodes.map((flowNode) => ({
+  ...flowNode,
+  measured: { width: 340, height: 160 },
+}));
+const measured = dragModule.updateFkRoutingSnapshot(settled, measuredNodes, undefined);
+assert.notEqual(measured, settled);
+assert.equal(measured.nodes, measuredNodes);
+```
+
+These catch the opposite mutations: rebuilding for presentation-only node
+changes and failing to rebuild when measured routing geometry changes.
+
+- [ ] **Step 4: Implement the minimal routing lifecycle**
+
+In `fk-drag-session.ts`, define:
 
 ```ts
-export function selectFkRoutingNodes(
-  nodes: TableFlowNode[],
-  session: FkDragSession | undefined,
-): TableFlowNode[] {
-  return session?.frozenNodes ?? nodes;
+export interface FkRoutingSnapshot {
+  nodes: TableFlowNode[];
+  dragSession?: FkDragSession;
 }
+
+export function updateFkRoutingSnapshot(
+  current: FkRoutingSnapshot | undefined,
+  nodes: TableFlowNode[],
+  dragSession: FkDragSession | undefined,
+): FkRoutingSnapshot;
 ```
 
-Change `FkDragSession.frozenNodes` from `readonly TableFlowNode[]` to
-`TableFlowNode[]` so the selector remains compatible with the existing graph
-interfaces without copying. Keep the function pure and preserve the caller's
-exact array references.
+Implement these exact transitions:
 
-- [ ] **Step 4: Run focused and renderer tests and verify GREEN**
+1. If `dragSession` exists and `current?.dragSession === dragSession`, return
+   `current` before comparing any nodes.
+2. If a new drag session exists, return `{ nodes: dragSession.frozenNodes,
+   dragSession }`.
+3. If the previous snapshot held a drag session and the new session is absent,
+   return `{ nodes }`.
+4. Outside a drag, return `current` when IDs, positions, and measured sizes are
+   equivalent; otherwise return `{ nodes }`.
 
-Run:
+Move `areFkRoutingNodesEqual` from `ErdCanvas.tsx` into this module as a private
+helper. It compares array length, IDs, positions, and measured width/height in
+order and does not inspect selection or presentation data.
+
+- [ ] **Step 5: Run focused and renderer tests and verify GREEN**
 
 ```bash
 rtk npm test -w @dbml-canvas/renderer
@@ -94,154 +145,114 @@ rtk npm test -w @dbml-canvas/renderer
 
 Expected: every renderer test passes.
 
-- [ ] **Step 5: Commit Task 1**
+- [ ] **Step 6: Commit Task 1**
 
 ```bash
 rtk git add packages/renderer/src/fk-drag-session.ts packages/renderer/test/fk-drag-session.test.mjs
-rtk git commit -m "perf(renderer): freeze FK routing input during drag"
+rtk git commit -m "perf(renderer): stabilize FK routing drag lifecycle"
 ```
 
 ---
 
-### Task 2: Remove pointer-frame edge updates from ErdCanvas
+### Task 2: Drive ErdCanvas edges from the stable snapshot
 
 **Files:**
 - Modify: `packages/renderer/src/ErdCanvas.tsx`
-- Modify: `packages/renderer/test/fk-drag-session.test.mjs`
-- Modify: `packages/renderer/test/fk-routing.test.mjs`
 - Modify: `packages/renderer/test/fk-edge.test.mjs`
+- Modify: `packages/renderer/test/fk-routing.test.mjs`
 
 **Interfaces:**
-- Consumes: `selectFkRoutingNodes` from Task 1.
-- Consumes: `updateFlowEdgesDuringDrag(schema, nodes, currentEdges, movedNodeIds, fkPresentation?)` exactly once per drag-session or presentation transition.
-- Produces: an edge-routing effect whose node dependency is the frozen snapshot during drag and the current measured nodes outside drag.
+- Consumes: `updateFkRoutingSnapshot` from Task 1.
+- Consumes: `updateFlowEdgesDuringDrag(schema, snapshot.nodes, currentEdges, snapshot.dragSession.movedNodeIds, fkPresentation?)`.
+- Produces: an edge effect keyed by `FkRoutingSnapshot`, schema, and focus presentation rather than live React Flow nodes.
 
-- [ ] **Step 1: Write the failing canvas lifecycle regression**
+- [ ] **Step 1: Add endpoint-driven adaptive-path characterization**
 
-Replace the existing source-level assertion named
-`ErdCanvas selectively updates edges only while an FK drag session is active`
-with assertions that require an explicitly stable routing input:
+The framework boundary assumption is that React Flow supplies changing endpoint
+props while stable edge data remains mounted. Add this narrow test to
+`fk-edge.test.mjs`:
 
 ```js
-test('ErdCanvas keeps its edge routing dependency stable during pointer movement', async () => {
-  const source = await readFile(new URL('../src/ErdCanvas.tsx', import.meta.url), 'utf8');
+test('adaptive FK paths follow endpoint props without new routing nodes', () => {
+  const before = resolveFkRoute(params, nodes, 'adaptive');
+  const after = resolveFkRoute({
+    ...params,
+    sourceX: params.sourceX + 120,
+    sourceY: params.sourceY + 40,
+  }, nodes, 'adaptive');
 
-  assert.match(source, /selectFkRoutingNodes\(routingNodesRef\.current, fkDragSession\)/);
-  assert.match(source, /if \(!fkDragSession && !areFkRoutingNodesEqual/);
-  assert.match(source, /updateFlowEdgesDuringDrag\([\s\S]*fkRoutingNodes[\s\S]*fkDragSession\.movedNodeIds/);
-  assert.match(source, /\[fkDragSession, fkPresentation, fkRoutingNodes, schema, setEdges\]/);
-  assert.doesNotMatch(source, /\[fkDragSession, fkPresentation, routingNodes, schema, setEdges\]/);
+  assert.notEqual(after.path, before.path);
+  assert.equal(before.kind, 'adaptive');
+  assert.equal(after.kind, 'adaptive');
 });
 ```
 
-Retain the existing assertions for drag start, drag stop, multi-node layout
-persistence, and removal of the old global `routingMode` state.
+Run it before the integration edit. It is expected to pass because it
+characterizes an existing dependency behavior; Task 1's observed RED is the
+test-first proof for the new lifecycle behavior.
 
-- [ ] **Step 2: Run the focused lifecycle test and verify RED**
+- [ ] **Step 2: Replace the canvas routing ref with the lifecycle snapshot**
 
-Run:
-
-```bash
-rtk npm run build -w @dbml-canvas/renderer
-rtk node --test --test-name-pattern="edge routing dependency stable" packages/renderer/test/fk-drag-session.test.mjs
-```
-
-Expected: FAIL because `ErdCanvas` currently compares live nodes and depends on
-the resulting `routingNodes` reference on every drag frame.
-
-- [ ] **Step 3: Freeze the canvas routing dependency during a drag**
-
-Import `selectFkRoutingNodes` and replace the current routing-node block with:
+Import `updateFkRoutingSnapshot`, create one ref, and update it during render:
 
 ```ts
-const routingNodesRef = useRef<TableFlowNode[]>(nodes);
-if (
-  !fkDragSession
-  && !areFkRoutingNodesEqual(routingNodesRef.current, nodes)
-) {
-  routingNodesRef.current = nodes;
-}
-const fkRoutingNodes = selectFkRoutingNodes(
-  routingNodesRef.current,
+const fkRoutingSnapshotRef = useRef<FkRoutingSnapshot>();
+fkRoutingSnapshotRef.current = updateFkRoutingSnapshot(
+  fkRoutingSnapshotRef.current,
+  nodes,
   fkDragSession,
 );
+const fkRoutingSnapshot = fkRoutingSnapshotRef.current;
 ```
 
-In the edge effect, pass `fkRoutingNodes` to both
-`updateFlowEdgesDuringDrag` and `createFlowEdges`, and use exactly these
-dependencies:
+Remove the local `areFkRoutingNodesEqual` function and the old
+`routingNodesRef` block. In the edge effect:
 
-```ts
-[fkDragSession, fkPresentation, fkRoutingNodes, schema, setEdges]
-```
+- When `fkRoutingSnapshot.dragSession` exists, call
+  `updateFlowEdgesDuringDrag` with `fkRoutingSnapshot.nodes` and its moved IDs.
+- Otherwise call `createFlowEdges` with `fkRoutingSnapshot.nodes` in settled
+  mode and preserve selected IDs as today.
+- Depend on `fkRoutingSnapshot`, `fkPresentation`, `schema`, and `setEdges`.
 
-During a pointer frame, `nodes` may change but `fkDragSession` and
-`fkRoutingNodes` do not, so React does not run this effect or call `setEdges`.
-On drag stop, `fkDragSession` becomes undefined, the ref captures final nodes,
-and the same effect performs one settled rebuild.
+Because Task 1 returns the same snapshot object for every pointer frame in one
+session, those frames cannot retrigger the effect. A focus transition may still
+update presentation once, which is intentional.
 
-- [ ] **Step 4: Add a stable-edge identity regression**
+- [ ] **Step 3: Verify final handle recalculation behavior**
 
-Extend the selective routing test in `fk-routing.test.mjs` so its adaptive
-result is reused without another call while only the node collection changes:
+Extend the drag test in `fk-routing.test.mjs` using a literal final geometry
+where `public.orders` crosses to the right of `public.users`. Assert that
+`createFlowEdges(dragSchema, finalNodes, 'settled')` returns:
 
 ```js
-const pointerFrameEdges = dragged;
-assert.equal(pointerFrameEdges.find(({ id }) => id === 'orders-user'), connected);
-assert.equal(pointerFrameEdges.find(({ id }) => id === 'audit-team'), unrelated);
+assert.equal(settledConnected.sourceHandle, 'source:left:public.orders.user_id');
+assert.equal(settledConnected.targetHandle, 'target:right:public.users.id');
+assert.equal(settledConnected.data.routingMode, 'settled');
 ```
 
-Then verify separately that a final `createFlowEdges` call with nodes moved
-past the opposite table recalculates the source and target handles and sets
-`routingMode` to `settled`.
+This catches a missing settled rebuild or accidentally frozen handle choice.
 
-- [ ] **Step 5: Verify adaptive endpoint-driven paths without edge-data changes**
-
-Extend `fk-edge.test.mjs` with two `resolveFkRoute` calls that share the same
-nodes and adaptive mode but use different endpoint coordinates:
-
-```js
-const before = resolveFkRoute(params, nodes, 'adaptive');
-const after = resolveFkRoute({
-  ...params,
-  sourceX: params.sourceX + 120,
-  sourceY: params.sourceY + 40,
-}, nodes, 'adaptive');
-
-assert.notEqual(after.path, before.path);
-```
-
-Run the focused test before production changes if it is added before Step 3.
-It may already pass because endpoint-driven adaptive routing exists; in that
-case it is characterization coverage, while the lifecycle test remains the
-required observed RED for the production change.
-
-- [ ] **Step 6: Run renderer tests, typecheck, and build and verify GREEN**
-
-Run:
+- [ ] **Step 4: Run renderer verification and inspect the diff**
 
 ```bash
 rtk npm test -w @dbml-canvas/renderer
 rtk npm run typecheck -w @dbml-canvas/renderer
 rtk npm run build -w @dbml-canvas/renderer
-```
-
-Expected: every command exits 0.
-
-- [ ] **Step 7: Review the task diff and commit Task 2**
-
-Run:
-
-```bash
 rtk git diff --check
-rtk git diff -- packages/renderer/src packages/renderer/test
 ```
 
-Confirm there is no routing-driven `setEdges` dependency on live node changes
-while `fkDragSession` exists, then commit:
+Expected: every command exits 0. Inspect the complete task diff and verify:
+
+```text
+drag start   -> snapshot changes; connected edges become adaptive once
+pointer move -> snapshot identity stays fixed; edge effect does not run
+drag stop    -> snapshot changes; all edges rebuild settled once
+```
+
+- [ ] **Step 5: Commit Task 2**
 
 ```bash
-rtk git add packages/renderer/src/ErdCanvas.tsx packages/renderer/test/fk-drag-session.test.mjs packages/renderer/test/fk-routing.test.mjs packages/renderer/test/fk-edge.test.mjs
+rtk git add packages/renderer/src/ErdCanvas.tsx packages/renderer/test/fk-edge.test.mjs packages/renderer/test/fk-routing.test.mjs
 rtk git commit -m "perf(renderer): avoid FK edge updates on drag frames"
 ```
 
@@ -250,7 +261,7 @@ rtk git commit -m "perf(renderer): avoid FK edge updates on drag frames"
 ### Task 3: Full verification and IntelliJ 0.1.5 package validation
 
 **Files:**
-- Modify only if an in-scope verification defect is reproduced with a failing test first.
+- Modify only when an in-scope defect is first reproduced by a failing test.
 
 **Interfaces:**
 - Consumes: the shared renderer output from Tasks 1 and 2.
@@ -266,18 +277,12 @@ rtk npm run build
 
 Expected: every command exits 0 with no new warnings.
 
-- [ ] **Step 2: Review the final renderer diff independently**
+- [ ] **Step 2: Perform an independent final review**
 
-Read the complete diff from the design commit and check these invariants:
-
-```text
-drag start  -> one connected-edge adaptive replacement
-pointer move -> node updates only; no routing-driven setEdges
-drag stop   -> one complete settled edge rebuild and one layout persistence
-```
-
-Also check schema/layout cancellation, focus transitions, edge selection,
-multi-node dragging, and MiniMap snapshot cleanup.
+Read the complete diff from the design commit. Check schema/layout
+cancellation, focus transitions, edge selection, multi-node dragging, MiniMap
+snapshot cleanup, and the start/move/stop invariants above. Any defect must
+receive its own observed RED before correction.
 
 - [ ] **Step 3: Build a clean IntelliJ plugin with JDK 21**
 
@@ -290,27 +295,25 @@ rtk env JAVA_HOME=/Users/changhyeonkim/Library/Java/JavaVirtualMachines/temurin-
 Expected: Gradle exits 0 and creates
 `build/distributions/dbml-canvas-intellij-0.1.5.zip`.
 
-- [ ] **Step 4: Inspect packaged host-webview assets**
+- [ ] **Step 4: Inspect packaged assets**
 
-List the ZIP, extract its webview asset names, and compare their SHA-256 hashes
-with `apps/host-webview/dist`. Expected: the packaged HTML, CSS, JavaScript, and
-source map are exactly the current production build with no stale assets.
+List the ZIP, extract its webview asset names, and compare SHA-256 hashes with
+`apps/host-webview/dist`. Expected: packaged HTML, CSS, JavaScript, and source
+map exactly match the current production build and contain no stale assets.
 
 - [ ] **Step 5: Perform available interaction smoke testing**
 
-Use a dense schema and confirm that a connected FK follows the dragged table,
-unrelated FK paths and the MiniMap snapshot remain fixed, and all settled routes
+Use a dense schema and confirm that connected FK paths follow the table,
+unrelated FK paths and the MiniMap snapshot remain fixed, and settled routes
 update after release. If no browser backend or IntelliJ GUI runtime is
 available, report that limitation explicitly and do not claim a visual pass.
 
 - [ ] **Step 6: Record final status**
-
-Run:
 
 ```bash
 rtk git status --short --branch
 rtk git log -5 --oneline
 ```
 
-Confirm only the user's pre-existing untracked `todo.txt` remains and report
-the final test counts, package path, size, and SHA-256.
+Confirm only the user's pre-existing `todo.txt` remains in the main checkout
+and report final test counts, package path, size, and SHA-256.
