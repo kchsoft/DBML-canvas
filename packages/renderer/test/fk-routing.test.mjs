@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as graph from '../dist/graph.js';
 import {
   chooseFkHandleSides,
   makeFkHandleId,
@@ -93,6 +94,7 @@ test('creates an FK edge with geometry-selected handles and preserved semantics'
   assert.equal(edge.targetHandle, 'target:right:public.users.id');
   assert.deepEqual(edge.data, {
     routingMode: 'settled',
+    routingNodes: [node('public.orders', 500), node('public.users', 0)],
     selfReference: false,
     focusState: 'idle',
   });
@@ -186,4 +188,76 @@ test('carries one focus presentation into table nodes and FK edges', () => {
   assert.deepEqual(updatedOrders.measured, { width: 340, height: 120 });
   assert.equal(updatedOrders.position, measuredNodes[0].position);
   assert.equal(updatedOrders.data.activeFkColumnId, 'public.orders.user_id');
+});
+
+test('shares one routing snapshot and selectively replaces connected edges during a drag', () => {
+  assert.equal(typeof graph.updateFlowEdgesDuringDrag, 'function');
+
+  const dragSchema = {
+    version: 1,
+    tables: [],
+    relationships: [
+      schema.relationships[0],
+      {
+        id: 'audit-team',
+        source: {
+          tableId: 'public.audit',
+          columnIds: ['public.audit.team_id'],
+          cardinality: '*',
+        },
+        target: {
+          tableId: 'public.teams',
+          columnIds: ['public.teams.id'],
+          cardinality: '1',
+        },
+      },
+    ],
+    warnings: [],
+  };
+  const initialNodes = [
+    node('public.orders', 0),
+    node('public.users', 500),
+    node('public.audit', 0),
+    node('public.teams', 500),
+  ];
+  const movedNodes = initialNodes.map((flowNode) => (
+    flowNode.id === 'public.orders'
+      ? { ...flowNode, position: { x: 200, y: 40 } }
+      : flowNode
+  ));
+  const initial = createFlowEdges(dragSchema, initialNodes, 'settled');
+  const current = [{ ...initial[0], selected: true }, initial[1]];
+
+  assert.equal(initial[0].data.routingNodes, initialNodes);
+  assert.equal(initial[1].data.routingNodes, initialNodes);
+
+  const dragged = graph.updateFlowEdgesDuringDrag(
+    dragSchema,
+    movedNodes,
+    current,
+    new Set(['public.orders']),
+  );
+
+  const connected = dragged.find(({ id }) => id === 'orders-user');
+  const unrelated = dragged.find(({ id }) => id === 'audit-team');
+  assert.notEqual(connected, current[0]);
+  assert.equal(connected.selected, true);
+  assert.equal(connected.data.routingMode, 'adaptive');
+  assert.equal(connected.data.routingNodes, movedNodes);
+  assert.equal(unrelated, current[1]);
+
+  const focused = graph.updateFlowEdgesDuringDrag(
+    dragSchema,
+    movedNodes,
+    dragged,
+    new Set(['public.orders']),
+    {
+      relationshipIds: new Set(['orders-user']),
+      endpointColumnIds: new Set(),
+    },
+  );
+  assert.equal(focused.find(({ id }) => id === 'orders-user').data.focusState, 'focused');
+  assert.notEqual(focused.find(({ id }) => id === 'audit-team'), unrelated);
+  assert.equal(focused.find(({ id }) => id === 'audit-team').data.focusState, 'dimmed');
+  assert.equal(focused.find(({ id }) => id === 'audit-team').data.routingNodes, initialNodes);
 });

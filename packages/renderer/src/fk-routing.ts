@@ -8,6 +8,7 @@ export type FkHandleRole = 'source' | 'target';
 
 export interface FkEdgeData extends Record<string, unknown> {
   routingMode: FkRoutingMode;
+  routingNodes: Node[];
   selfReference: boolean;
   focusState: FkFocusState;
 }

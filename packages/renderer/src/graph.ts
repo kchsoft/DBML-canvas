@@ -160,7 +160,7 @@ export function applyFkFocusPresentationToNodes(
 
 export function createFlowEdges(
   schema: ErdSchema,
-  nodes: FkGeometryNode[] = [],
+  nodes: TableFlowNode[] = [],
   routingMode: FkRoutingMode = 'settled',
   fkPresentation?: FkFocusPresentation,
 ): FkFlowEdge[] {
@@ -194,6 +194,7 @@ export function createFlowEdges(
       type: 'fk',
       data: {
         routingMode,
+        routingNodes: nodes,
         selfReference: relationship.source.tableId === relationship.target.tableId,
         focusState: fkPresentation
           ? getFkEdgeFocusState(fkPresentation, relationship.id)
@@ -202,6 +203,52 @@ export function createFlowEdges(
       label,
       labelStyle: { fontSize: 11 },
       style: { strokeWidth: 1.5 },
+    };
+  });
+}
+
+export function updateFlowEdgesDuringDrag(
+  schema: ErdSchema,
+  nodes: TableFlowNode[],
+  currentEdges: FkFlowEdge[],
+  movedNodeIds: ReadonlySet<string>,
+  fkPresentation?: FkFocusPresentation,
+): FkFlowEdge[] {
+  const connectedRelationships = schema.relationships.filter((relationship) => (
+    movedNodeIds.has(relationship.source.tableId)
+    || movedNodeIds.has(relationship.target.tableId)
+  ));
+  const connectedEdges = new Map(
+    createFlowEdges(
+      { ...schema, relationships: connectedRelationships },
+      nodes,
+      'adaptive',
+      fkPresentation,
+    ).map((edge) => [edge.id, edge]),
+  );
+
+  return currentEdges.map((edge) => {
+    const connected = connectedEdges.get(edge.id);
+    if (connected) {
+      return {
+        ...connected,
+        ...(edge.selected ? { selected: true } : {}),
+      };
+    }
+
+    const focusState = fkPresentation
+      ? getFkEdgeFocusState(fkPresentation, edge.id)
+      : 'idle';
+    if (edge.data?.focusState === focusState) return edge;
+
+    return {
+      ...edge,
+      data: {
+        routingMode: edge.data?.routingMode ?? 'settled',
+        routingNodes: edge.data?.routingNodes ?? nodes,
+        selfReference: edge.data?.selfReference ?? edge.source === edge.target,
+        focusState,
+      },
     };
   });
 }
