@@ -1,7 +1,8 @@
 import { Parser } from '@dbml/core';
-import { makeColumnId, makeRelationshipId, makeTableId } from './ids.js';
+import { makeColumnId, makeEnumId, makeRelationshipId, makeTableId } from './ids.js';
 import type {
   ErdColumn,
+  ErdEnum,
   ErdRelationship,
   ErdSchema,
   ErdTable,
@@ -28,6 +29,18 @@ interface DbmlField {
   noteToken?: DbmlToken;
   token?: DbmlToken;
   table?: DbmlTable;
+  _enum?: DbmlEnum;
+}
+
+interface DbmlEnumValue {
+  name?: unknown;
+  note?: unknown;
+}
+
+interface DbmlEnum {
+  name?: unknown;
+  values?: DbmlEnumValue[];
+  schema?: DbmlSchema;
 }
 
 interface DbmlIndexColumn {
@@ -72,6 +85,7 @@ interface DbmlRef {
 
 interface DbmlSchema {
   name?: unknown;
+  enums?: DbmlEnum[];
   tables?: DbmlTable[];
   refs?: DbmlRef[];
 }
@@ -92,12 +106,39 @@ export class DbmlCoreSchemaParser implements SchemaParser {
 
 export function mapDatabase(database: DbmlDatabase, options: ParseOptions = {}): ErdSchema {
   const warnings: string[] = [];
+  const enums: ErdEnum[] = [];
   const tables: ErdTable[] = [];
   const relationships: ErdRelationship[] = [];
   const schemas = Array.isArray(database.schemas) ? database.schemas : [];
 
   for (const rawSchema of schemas) {
     const schemaName = asNonEmptyString(rawSchema.name) ?? 'public';
+    const rawEnums = Array.isArray(rawSchema.enums) ? rawSchema.enums : [];
+    for (const rawEnum of rawEnums) {
+      const enumName = asNonEmptyString(rawEnum.name);
+      if (!enumName) {
+        warnings.push(`Skipped an enum without a name in schema ${schemaName}.`);
+        continue;
+      }
+
+      const values = (Array.isArray(rawEnum.values) ? rawEnum.values : []).flatMap((value) => {
+        const valueName = asNonEmptyString(value.name);
+        if (!valueName) {
+          warnings.push(`Skipped an unnamed value in enum ${schemaName}.${enumName}.`);
+          return [];
+        }
+        const note = asOptionalNote(value.note);
+        return [{ name: valueName, ...(note ? { note } : {}) }];
+      });
+      enums.push({
+        id: makeEnumId(schemaName, enumName),
+        schema: schemaName,
+        name: enumName,
+        displayName: schemaName === 'public' ? enumName : `${schemaName}.${enumName}`,
+        values,
+      });
+    }
+
     const rawTables = Array.isArray(rawSchema.tables) ? rawSchema.tables : [];
 
     for (const rawTable of rawTables) {
@@ -126,6 +167,7 @@ export function mapDatabase(database: DbmlDatabase, options: ParseOptions = {}):
           nullable: !Boolean(field.not_null) && !Boolean(field.pk),
           increment: Boolean(field.increment),
           ...optionalDefaultValue(field.dbdefault),
+          ...optionalEnumId(field._enum, schemaName),
           ...optionalString('note', field.note),
           ...optionalNamedRange('noteSource', field.noteToken, options.filepath),
           ...optionalRange(field.token, options.filepath),
@@ -196,10 +238,18 @@ export function mapDatabase(database: DbmlDatabase, options: ParseOptions = {}):
   return {
     version: 1,
     ...optionalString('name', database.name),
+    enums,
     tables,
     relationships,
     warnings,
   };
+}
+
+function optionalEnumId(value: DbmlEnum | undefined, fallbackSchema: string): { enumId?: string } {
+  const enumName = asNonEmptyString(value?.name);
+  if (!enumName) return {};
+  const schemaName = asNonEmptyString(value?.schema?.name) ?? fallbackSchema;
+  return { enumId: makeEnumId(schemaName, enumName) };
 }
 
 function mapEndpoint(endpoint: DbmlEndpoint, warnings: string[]) {
@@ -268,6 +318,11 @@ function optionalDefaultValue(value: unknown): { defaultValue?: string } {
 function optionalString<K extends string>(key: K, value: unknown): Partial<Record<K, string>> {
   const stringValue = asNonEmptyString(value);
   return stringValue ? { [key]: stringValue } as Partial<Record<K, string>> : {};
+}
+
+function asOptionalNote(value: unknown): string | undefined {
+  if (isRecord(value) && 'value' in value) return asNonEmptyString(value.value);
+  return asNonEmptyString(value);
 }
 
 function optionalRange(token: DbmlToken | undefined, fallbackFilepath?: string): { source?: SourceRange } {

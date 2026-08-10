@@ -20,9 +20,23 @@ export interface ErdColumn {
   nullable: boolean;
   increment: boolean;
   defaultValue?: string;
+  enumId?: string;
   note?: string;
   noteSource?: SourceRange;
   source?: SourceRange;
+}
+
+export interface ErdEnumValue {
+  name: string;
+  note?: string;
+}
+
+export interface ErdEnum {
+  id: string;
+  schema: string;
+  name: string;
+  displayName: string;
+  values: ErdEnumValue[];
 }
 
 export interface ErdIndexMember {
@@ -69,6 +83,7 @@ export interface ErdRelationship {
 export interface ErdSchema {
   version: 1;
   name?: string;
+  enums: ErdEnum[];
   tables: ErdTable[];
   relationships: ErdRelationship[];
   warnings: string[];

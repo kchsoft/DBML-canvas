@@ -67,6 +67,43 @@ test('maps dbml-core objects into stable ERD models', () => {
   });
 });
 
+test('maps resolved enum definitions and column associations in declaration order', () => {
+  const statusEnum = {
+    name: 'member_status',
+    values: [
+      { name: 'pending', note: { value: 'Awaiting review' } },
+      { name: 'active' },
+    ],
+  };
+  const schema = mapDatabase({
+    schemas: [{
+      name: 'account',
+      enums: [statusEnum],
+      tables: [{
+        name: 'member',
+        fields: [
+          { name: 'status', type: { type_name: 'member_status' }, _enum: statusEnum },
+          { name: 'external_type', type: { type_name: 'member_status' } },
+        ],
+      }],
+      refs: [],
+    }],
+  });
+
+  assert.deepEqual(schema.enums, [{
+    id: 'account.member_status',
+    schema: 'account',
+    name: 'member_status',
+    displayName: 'account.member_status',
+    values: [
+      { name: 'pending', note: 'Awaiting review' },
+      { name: 'active' },
+    ],
+  }]);
+  assert.equal(schema.tables[0].columns[0].enumId, 'account.member_status');
+  assert.equal(schema.tables[0].columns[1].enumId, undefined);
+});
+
 test('merges, validates, updates, and prunes layout data', () => {
   const schema = mapDatabase({
     schemas: [{
