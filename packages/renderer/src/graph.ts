@@ -20,6 +20,7 @@ import {
   type FkRoutingMode,
 } from './fk-routing.js';
 import { createSchemaDetails, type TableDetails } from './schema-details.js';
+import type { SchemaSearchSelection } from './schema-explorer.js';
 
 export interface TableNodeData extends Record<string, unknown> {
   table: ErdSchema['tables'][number];
@@ -30,6 +31,8 @@ export interface TableNodeData extends Record<string, unknown> {
   activeFkColumnId?: string;
   relatedFkColumnIds?: readonly string[];
   onFkColumnFocus?: (columnId: string) => void;
+  searchSelectedTable?: boolean;
+  searchSelectedColumnId?: string;
 }
 
 export type TableFlowNode = Node<TableNodeData, 'table'>;
@@ -52,6 +55,7 @@ export function createFlowNodes(
   onEditNote?: TableNoteEditHandler,
   fkPresentation?: FkFocusPresentation,
   onFkColumnFocus?: (columnId: string) => void,
+  searchSelection?: SchemaSearchSelection,
 ): TableFlowNode[] {
   const positions = applyLayout(schema, layout);
   const details = createSchemaDetails(schema);
@@ -78,12 +82,44 @@ export function createFlowNodes(
           : {}),
         ...(relatedFkColumnIds.length > 0 ? { relatedFkColumnIds } : {}),
         ...(onFkColumnFocus ? { onFkColumnFocus } : {}),
+        ...(searchSelection?.kind === 'table' && searchSelection.tableId === table.id
+          ? { searchSelectedTable: true }
+          : {}),
+        ...(searchSelection?.kind === 'column' && searchSelection.tableId === table.id
+          ? { searchSelectedColumnId: searchSelection.columnId }
+          : {}),
         ...(onAnnotationChange
           ? { onAnnotationChange: (patch: NodeAnnotationPatch) => onAnnotationChange(
             table.id,
             { x: nodeLayout.x, y: nodeLayout.y },
             patch,
           ) }
+          : {}),
+      },
+    };
+  });
+}
+
+export function applySchemaSearchSelectionToNodes(
+  nodes: TableFlowNode[],
+  selection: SchemaSearchSelection | undefined,
+): TableFlowNode[] {
+  return nodes.map((node) => {
+    const {
+      searchSelectedTable: _searchSelectedTable,
+      searchSelectedColumnId: _searchSelectedColumnId,
+      ...stableData
+    } = node.data;
+
+    return {
+      ...node,
+      data: {
+        ...stableData,
+        ...(selection?.kind === 'table' && selection.tableId === node.id
+          ? { searchSelectedTable: true }
+          : {}),
+        ...(selection?.kind === 'column' && selection.tableId === node.id
+          ? { searchSelectedColumnId: selection.columnId }
           : {}),
       },
     };

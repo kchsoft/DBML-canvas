@@ -22,6 +22,8 @@ test('forwards dark color mode to React Flow', () => {
   }));
 
   assert.match(markup, /class="react-flow dark"/);
+  assert.match(markup, /aria-label="Open schema explorer"/);
+  assert.match(markup, /aria-expanded="false"/);
 });
 
 test('creates the initial FK graph in settled routing mode', () => {
@@ -75,4 +77,32 @@ test('creates the initial FK graph in settled routing mode', () => {
     selfReference: false,
     focusState: 'idle',
   });
+});
+
+test('creates initial table nodes with the current search selection', () => {
+  const graphSchema = {
+    version: 1,
+    tables: [{
+      id: 'public.accounts',
+      name: 'accounts',
+      displayName: 'accounts',
+      schemaName: 'public',
+      columns: [],
+      indexes: [],
+    }],
+    relationships: [],
+    warnings: [],
+  };
+
+  const state = createInitialFlowState(
+    graphSchema,
+    layout,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    { kind: 'table', tableId: 'public.accounts' },
+  );
+
+  assert.equal(state.nodes[0].data.searchSelectedTable, true);
 });

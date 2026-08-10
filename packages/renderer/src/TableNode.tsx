@@ -51,6 +51,8 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
     activeFkColumnId,
     relatedFkColumnIds = [],
     onFkColumnFocus,
+    searchSelectedTable,
+    searchSelectedColumnId,
   } = data;
   const relatedFkColumns = new Set(relatedFkColumnIds);
   const [activeDetail, setActiveDetail] = useState<ActiveDetail>();
@@ -197,7 +199,11 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
 
   return (
     <article
-      className={`dbml-table-node${selected ? ' is-selected' : ''}`}
+      className={[
+        'dbml-table-node',
+        selected ? 'is-selected' : '',
+        searchSelectedTable ? 'is-search-selected' : '',
+      ].filter(Boolean).join(' ')}
       data-table-color={layout.color}
       style={!layout.color && table.headerColor
         ? { '--dbml-header-color': table.headerColor } as CSSProperties
@@ -255,11 +261,14 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
           const columnDetails = details.columns[column.id];
           const activeFk = activeFkColumnId === column.id;
           const relatedFk = !activeFk && relatedFkColumns.has(column.id);
+          const searchSelected = searchSelectedColumnId === column.id;
           return (
             <div
-              className={`dbml-column-row${activeFk
-                ? ' is-fk-active'
-                : relatedFk ? ' is-fk-related' : ''}`}
+              className={[
+                'dbml-column-row',
+                activeFk ? 'is-fk-active' : relatedFk ? 'is-fk-related' : '',
+                searchSelected ? 'is-search-selected' : '',
+              ].filter(Boolean).join(' ')}
               key={column.id}
               tabIndex={0}
               {...(onFkColumnFocus
