@@ -59,8 +59,10 @@ import {
   reconcileFkDragSession,
   preserveFlowNodeMeasurements,
   startFkDragSession,
+  updateFkRoutingSnapshot,
   updateDraggedNodesLayout,
   type FkDragSession,
+  type FkRoutingSnapshot,
 } from './fk-drag-session.js';
 import { TableNode } from './TableNode.js';
 import { handleSchemaExplorerEscape, SchemaExplorer } from './SchemaExplorer.js';
@@ -105,23 +107,6 @@ export const TRACKPAD_VIEWPORT_OPTIONS = Object.freeze({
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 2.5;
-
-function areFkRoutingNodesEqual(left: TableFlowNode[], right: TableFlowNode[]): boolean {
-  if (left.length !== right.length) return false;
-
-  return left.every((node, index) => {
-    const other = right[index];
-    return other !== undefined
-      && node.id === other.id
-      && node.position.x === other.position.x
-      && node.position.y === other.position.y
-      && node.measured?.width === other.measured?.width
-      && node.measured?.height === other.measured?.height
-      && node.width === other.width
-      && node.height === other.height
-      && node.hidden === other.hidden;
-  });
-}
 
 export function createInitialFlowState(
   schema: ErdSchema,
@@ -270,31 +255,33 @@ function ErdCanvasInner({
     ));
   }, [fkPresentation, handleFkColumnFocus, setNodes]);
 
-  const routingNodesRef = useRef(nodes);
-  if (!areFkRoutingNodesEqual(routingNodesRef.current, nodes)) {
-    routingNodesRef.current = nodes;
-  }
-  const routingNodes = routingNodesRef.current;
+  const fkRoutingSnapshotRef = useRef<FkRoutingSnapshot | undefined>(undefined);
+  const fkRoutingSnapshot = updateFkRoutingSnapshot(
+    fkRoutingSnapshotRef.current,
+    nodes,
+    fkDragSession,
+  );
+  fkRoutingSnapshotRef.current = fkRoutingSnapshot;
 
   useEffect(() => {
     setEdges((current) => {
-      if (fkDragSession) {
+      if (fkRoutingSnapshot.dragSession) {
         return updateFlowEdgesDuringDrag(
           schema,
-          routingNodes,
+          fkRoutingSnapshot.nodes,
           current,
-          fkDragSession.movedNodeIds,
+          fkRoutingSnapshot.dragSession.movedNodeIds,
           fkPresentation,
         );
       }
 
       const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id));
-      return createFlowEdges(schema, routingNodes, 'settled', fkPresentation).map((edge) => ({
+      return createFlowEdges(schema, fkRoutingSnapshot.nodes, 'settled', fkPresentation).map((edge) => ({
         ...edge,
         ...(selectedIds.has(edge.id) ? { selected: true } : {}),
       }));
     });
-  }, [fkDragSession, fkPresentation, routingNodes, schema, setEdges]);
+  }, [fkPresentation, fkRoutingSnapshot, schema, setEdges]);
 
   const handleEdgeClick: EdgeMouseHandler<FkFlowEdge> = useCallback((event, edge) => {
     event.stopPropagation();

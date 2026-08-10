@@ -41,6 +41,19 @@ test('uses an adaptive path without invoking smart routing during a drag', () =>
   assert.equal(Number.isFinite(adaptive.labelY), true);
 });
 
+test('adaptive FK paths follow endpoint props without new routing nodes', () => {
+  const before = resolveFkRoute(params, nodes, 'adaptive');
+  const after = resolveFkRoute({
+    ...params,
+    sourceX: params.sourceX + 120,
+    sourceY: params.sourceY + 40,
+  }, nodes, 'adaptive');
+
+  assert.notEqual(after.path, before.path);
+  assert.equal(before.kind, 'adaptive');
+  assert.equal(after.kind, 'adaptive');
+});
+
 test('uses a successful settled smart route and its label coordinates', () => {
   const smart = resolveFkRoute(params, nodes, 'settled', () => ({
     svgPathString: 'M 0,0 L 10,0',

@@ -260,4 +260,15 @@ test('shares one routing snapshot and selectively replaces connected edges durin
   assert.notEqual(focused.find(({ id }) => id === 'audit-team'), unrelated);
   assert.equal(focused.find(({ id }) => id === 'audit-team').data.focusState, 'dimmed');
   assert.equal(focused.find(({ id }) => id === 'audit-team').data.routingNodes, initialNodes);
+
+  const finalNodes = initialNodes.map((flowNode) => (
+    flowNode.id === 'public.orders'
+      ? { ...flowNode, position: { x: 900, y: 40 } }
+      : flowNode
+  ));
+  const settledConnected = createFlowEdges(dragSchema, finalNodes, 'settled')
+    .find(({ id }) => id === 'orders-user');
+  assert.equal(settledConnected.sourceHandle, 'source:left:public.orders.user_id');
+  assert.equal(settledConnected.targetHandle, 'target:right:public.users.id');
+  assert.equal(settledConnected.data.routingMode, 'settled');
 });

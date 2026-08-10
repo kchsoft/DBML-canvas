@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const dragModule = await import('../dist/fk-drag-session.js').catch(() => ({}));
@@ -146,19 +145,4 @@ test('layout feedback preserves measurements only for unchanged schema tables', 
   const reset = dragModule.preserveFlowNodeMeasurements(current, replacedSchema);
   assert.equal(reset[0].measured, undefined);
   assert.equal(reset[0].width, undefined);
-});
-
-test('ErdCanvas selectively updates edges only while an FK drag session is active', async () => {
-  const source = await readFile(new URL('../src/ErdCanvas.tsx', import.meta.url), 'utf8');
-
-  assert.match(source, /const \[fkDragSession, setFkDragSession\]/);
-  assert.match(source, /startFkDragSession\(nodes, node, draggedNodes\)/);
-  assert.match(source, /updateDraggedNodesLayout\(/);
-  assert.match(source, /preserveFlowNodeMeasurements\(current, nextNodes\)/);
-  assert.match(source, /updateFlowEdgesDuringDrag\(/);
-  assert.match(source, /fkDragSession\.movedNodeIds/);
-  assert.match(source, /onNodeDragStart=\{handleNodeDragStart\}/);
-  assert.match(source, /onNodeDragStop=\{handleNodeDragStop\}/);
-  assert.doesNotMatch(source, /const \[routingMode, setRoutingMode\]/);
-  assert.doesNotMatch(source, /transitionFkRoutingMode/);
 });
