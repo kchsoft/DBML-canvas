@@ -6,6 +6,7 @@ out/
 .idea/
 .vscode-test/
 .worktrees/
+.superpowers/
 *.iml
 .DS_Store
 .gradle/
