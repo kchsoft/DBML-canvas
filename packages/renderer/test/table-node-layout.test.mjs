@@ -31,6 +31,13 @@ test('sizes table nodes to their single-line content with a 340px minimum', asyn
   assert.doesNotMatch(css, /\.dbml-column-name\s*\{[^}]*text-overflow:\s*ellipsis;/s);
 });
 
+test('uses an amber canvas locator independently from FK presentation', async () => {
+  const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+
+  assert.match(css, /\.dbml-table-node\.is-search-selected\s*\{[^}]*outline:/s);
+  assert.match(css, /\.dbml-column-row\.is-search-selected\s*\{[^}]*box-shadow:/s);
+});
+
 test('shares column tracks across every row in a table', async () => {
   const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 

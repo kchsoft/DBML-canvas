@@ -15,6 +15,9 @@
   --dbml-yellow: #d89b24;
   --dbml-red: #c64b55;
   --dbml-purple: #7655bd;
+  --dbml-search: #c87912;
+  --dbml-search-soft: #fff1cf;
+  --dbml-search-border: #e0a13d;
 }
 
 [data-theme='dark'] {
@@ -32,14 +35,254 @@
   --dbml-yellow: #c58b20;
   --dbml-red: #c6535e;
   --dbml-purple: #7b5cc4;
+  --dbml-search: #f0ad4e;
+  --dbml-search-soft: #49351a;
+  --dbml-search-border: #b97922;
 }
 
 .dbml-canvas {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 320px;
   background: var(--dbml-bg);
   color: var(--dbml-text);
+}
+
+.dbml-schema-explorer-trigger {
+  position: absolute;
+  z-index: 21;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--dbml-border);
+  border-radius: 8px;
+  background: var(--dbml-surface);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 10%);
+  color: var(--dbml-text);
+  cursor: pointer;
+  transition: right 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+.dbml-canvas:has(.dbml-schema-explorer) .dbml-schema-explorer-trigger {
+  right: calc(min(320px, calc(100% - 64px)) + 20px);
+}
+
+.dbml-schema-explorer-trigger:hover {
+  border-color: var(--dbml-search-border);
+  background: color-mix(in srgb, var(--dbml-search-soft) 45%, var(--dbml-surface));
+}
+
+.dbml-schema-explorer {
+  position: absolute;
+  z-index: 20;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  width: min(320px, calc(100% - 64px));
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--dbml-border);
+  border-radius: 12px 6px 6px 12px;
+  background: var(--dbml-surface);
+  box-shadow: -8px 10px 24px rgb(0 0 0 / 14%);
+  color: var(--dbml-text);
+  font: 12px/1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.dbml-schema-explorer-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px 32px;
+  gap: 6px;
+  align-items: end;
+  padding: 12px;
+  border-bottom: 1px solid var(--dbml-border);
+  background: color-mix(in srgb, var(--dbml-surface) 92%, var(--dbml-bg));
+}
+
+.dbml-schema-explorer-header label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.dbml-schema-explorer-label {
+  color: var(--dbml-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dbml-schema-explorer input,
+.dbml-schema-explorer button {
+  border: 1px solid var(--dbml-border);
+  border-radius: 6px;
+  background: var(--dbml-surface);
+  color: var(--dbml-text);
+  font: inherit;
+}
+
+.dbml-schema-explorer input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.dbml-schema-explorer-header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.dbml-schema-explorer-trigger:focus-visible,
+.dbml-schema-explorer button:focus-visible {
+  outline: 2px solid var(--dbml-search);
+  outline-offset: 2px;
+}
+
+.dbml-schema-explorer input:focus-visible {
+  border-color: var(--dbml-search-border);
+  outline: 2px solid var(--dbml-search);
+  outline-offset: 1px;
+}
+
+.dbml-schema-explorer-header button:hover {
+  border-color: var(--dbml-search-border);
+  background: var(--dbml-search-soft);
+}
+
+.dbml-schema-explorer-results,
+.dbml-schema-explorer-columns {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dbml-schema-explorer-results {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.dbml-schema-explorer > p {
+  align-self: start;
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--dbml-muted);
+  text-align: center;
+}
+
+.dbml-schema-explorer-table {
+  border-bottom: 1px solid color-mix(in srgb, var(--dbml-border) 68%, transparent);
+}
+
+.dbml-schema-explorer-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.dbml-schema-explorer-table-row button,
+.dbml-schema-explorer-columns button {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+.dbml-schema-explorer-table-row button {
+  min-height: 40px;
+  padding: 8px 4px 8px 12px;
+  font-weight: 700;
+}
+
+.dbml-schema-explorer-table-row button > span {
+  display: inline-grid;
+  width: 18px;
+  place-items: center;
+  color: var(--dbml-muted);
+}
+
+.dbml-schema-explorer-table-row button > span:first-child {
+  position: relative;
+  color: transparent;
+}
+
+.dbml-schema-explorer-table-row button > span:first-child::after {
+  position: absolute;
+  color: var(--dbml-muted);
+  content: '›';
+  transform: rotate(0deg);
+  transition: transform 140ms ease;
+}
+
+.dbml-schema-explorer-table-row button[aria-expanded='true'] > span:first-child::after {
+  transform: rotate(90deg);
+}
+
+.dbml-schema-explorer-column-count {
+  min-width: 25px;
+  margin-right: 10px;
+  padding: 1px 6px;
+  border: 1px solid var(--dbml-border);
+  border-radius: 999px;
+  color: var(--dbml-muted);
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-align: center;
+}
+
+.dbml-schema-explorer-columns {
+  padding: 2px 0 7px;
+  background: color-mix(in srgb, var(--dbml-bg) 56%, var(--dbml-surface));
+}
+
+.dbml-schema-explorer-columns button {
+  min-height: 30px;
+  padding: 6px 12px 6px 50px;
+  color: var(--dbml-muted);
+  font-size: 11px;
+}
+
+.dbml-schema-explorer-table-row button:hover,
+.dbml-schema-explorer-columns button:hover {
+  background: var(--dbml-row-hover);
+  color: var(--dbml-text);
+}
+
+.dbml-schema-explorer button[aria-current='true'] {
+  background: color-mix(in srgb, var(--dbml-search-soft) 68%, var(--dbml-surface));
+  box-shadow: inset 3px 0 var(--dbml-search);
+  color: var(--dbml-text);
+}
+
+.dbml-schema-explorer mark {
+  border-radius: 2px;
+  background: var(--dbml-search-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dbml-search-border) 38%, transparent);
+  color: var(--dbml-search);
+  font-weight: inherit;
 }
 
 .dbml-table-node {
@@ -58,6 +301,15 @@
 .dbml-table-node.is-selected {
   outline: 2px solid var(--dbml-accent);
   outline-offset: 2px;
+}
+
+.dbml-table-node.is-search-selected {
+  outline: 2px solid var(--dbml-search);
+  outline-offset: 3px;
+}
+
+.dbml-table-node.is-search-selected .dbml-table-header {
+  box-shadow: inset 4px 0 var(--dbml-search), inset 0 -2px var(--dbml-search-border);
 }
 
 .dbml-table-node[data-table-color='blue'] { --dbml-header-color: var(--dbml-blue); }
@@ -412,6 +664,16 @@
   box-shadow: inset 3px 0 var(--dbml-accent);
 }
 
+.dbml-column-row.is-search-selected {
+  background: color-mix(in srgb, var(--dbml-search-soft) 76%, var(--dbml-surface));
+  box-shadow: inset 3px 0 var(--dbml-search);
+}
+
+.dbml-column-row.is-fk-related.is-search-selected,
+.dbml-column-row.is-fk-active.is-search-selected {
+  font-weight: 650;
+}
+
 .dbml-column-flags {
   display: flex;
   flex-wrap: wrap;
@@ -477,4 +739,12 @@
 .react-flow__minimap {
   border: 1px solid var(--dbml-border);
   background: var(--dbml-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dbml-schema-explorer-trigger,
+  .dbml-schema-explorer button,
+  .dbml-schema-explorer-table-row button > span:first-child::after {
+    transition: none;
+  }
 }

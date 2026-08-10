@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -92,4 +93,28 @@ test('renders a closed explorer trigger wired to the drawer', () => {
 
   assert.match(markup, /aria-controls="dbml-schema-explorer"/);
   assert.match(markup, /aria-expanded="false"/);
+});
+
+test('keeps explorer interaction inside the canvas and exposes its visual CSS contract', async () => {
+  const triggerMarkup = renderToStaticMarkup(createElement(SchemaExplorer, {
+    schema,
+    onSelectTable: () => {},
+    onSelectColumn: () => {},
+    onClose: () => {},
+  }));
+  const panelMarkup = renderToStaticMarkup(createElement(SchemaExplorerPanel, panelProps));
+  const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+
+  assert.match(triggerMarkup, /class="dbml-schema-explorer-trigger nodrag nopan nowheel"/);
+  assert.match(panelMarkup, /class="dbml-schema-explorer nodrag nopan nowheel"/);
+  assert.match(css, /--dbml-search:\s*#[0-9a-f]{6}/i);
+  assert.match(css, /\.dbml-schema-explorer\s*\{[^}]*position:\s*absolute/s);
+  assert.match(css, /\.dbml-schema-explorer\s*\{[^}]*width:\s*min\(320px, calc\(100% - 64px\)\)/s);
+  assert.match(css, /\.dbml-schema-explorer\s*\{[^}]*top:\s*12px/s);
+  assert.match(css, /\.dbml-schema-explorer-results\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.dbml-schema-explorer mark\s*\{[^}]*background:/s);
+  assert.match(
+    css,
+    /\.dbml-schema-explorer-trigger:focus-visible,\s*\.dbml-schema-explorer button:focus-visible\s*\{[^}]*outline:/s,
+  );
 });
