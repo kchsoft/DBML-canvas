@@ -8,6 +8,7 @@ import {
   canOpenDetail,
   isFkFocusActivationKey,
   shouldActivateFkFocus,
+  stopFkFocusClickPropagation,
   TableNode,
 } from '../dist/TableNode.js';
 
@@ -204,6 +205,8 @@ test('renders active and related FK columns with keyboard focus affordances', as
   assert.match(markup, /class="dbml-column-row is-fk-active"/);
   assert.match(markup, /class="dbml-column-row is-fk-related"/);
   assert.match(markup, /aria-label="Focus FK relationships for members\.owner_id"/);
+  assert.match(markup, /role="button"[^>]*aria-pressed="true"/);
+  assert.match(markup, /role="button"[^>]*aria-pressed="false"/);
   assert.match(css, /\.dbml-column-row\.is-fk-active\s*\{[^}]*box-shadow:/s);
   assert.match(css, /\.dbml-column-row\.is-fk-related\s*\{[^}]*background:/s);
   assert.match(css, /transition:[^;]*background-color 140ms/s);
@@ -217,4 +220,15 @@ test('does not treat keys from a nested column editor as FK focus shortcuts', ()
   assert.equal(shouldActivateFkFocus(' ', row, row), true);
   assert.equal(shouldActivateFkFocus('Enter', nestedEditor, row), false);
   assert.equal(shouldActivateFkFocus(' ', nestedEditor, row), false);
+});
+
+test('stops detail-popover clicks before they can change FK focus', () => {
+  let stopped = false;
+  stopFkFocusClickPropagation({
+    stopPropagation() {
+      stopped = true;
+    },
+  });
+
+  assert.equal(stopped, true);
 });

@@ -175,6 +175,7 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
       className={`dbml-detail-popover is-${popoverSide} nodrag nopan nowheel`}
       onMouseEnter={keepOpen}
       onMouseLeave={scheduleClose}
+      onClick={stopFkFocusClickPropagation}
       onFocus={keepOpen}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
@@ -262,7 +263,11 @@ export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
               key={column.id}
               tabIndex={0}
               {...(onFkColumnFocus
-                ? { 'aria-label': `Focus FK relationships for ${table.displayName}.${column.name}` }
+                ? {
+                    role: 'button',
+                    'aria-pressed': activeFk,
+                    'aria-label': `Focus FK relationships for ${table.displayName}.${column.name}`,
+                  }
                 : {})}
               onClick={(event) => {
                 event.stopPropagation();
@@ -330,6 +335,12 @@ export function shouldActivateFkFocus(
   currentTarget: EventTarget,
 ): boolean {
   return isFkFocusActivationKey(key) && isDirectFocusTarget(target, currentTarget);
+}
+
+export function stopFkFocusClickPropagation(
+  event: Pick<MouseEvent<HTMLElement>, 'stopPropagation'>,
+): void {
+  event.stopPropagation();
 }
 
 function resolveDetail(
