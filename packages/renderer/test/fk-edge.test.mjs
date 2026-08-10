@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Position } from '@xyflow/react';
-import { resolveFkRoute } from '../dist/FkEdge.js';
+import { getFkEdgeVisualProps, resolveFkRoute } from '../dist/FkEdge.js';
 
 const params = {
   sourceX: 100,
@@ -150,4 +151,33 @@ test('keeps a self-reference visible when both endpoints share a table', () => {
   assert.match(route.path, /^M/);
   assert.equal(Number.isFinite(route.labelX), true);
   assert.equal(Number.isFinite(route.labelY), true);
+});
+
+test('derives balanced focused, dimmed, and idle FK edge visuals', async () => {
+  const focused = getFkEdgeVisualProps('focused', { strokeWidth: 1.5 });
+  assert.deepEqual(focused.primaryStyle, {
+    strokeWidth: 3,
+    stroke: 'var(--dbml-accent)',
+    opacity: 1,
+  });
+  assert.deepEqual(focused.haloStyle, {
+    strokeWidth: 9,
+    stroke: 'var(--dbml-accent)',
+    opacity: 0.14,
+  });
+  assert.equal(focused.labelStyle.fill, 'var(--dbml-accent)');
+
+  const dimmed = getFkEdgeVisualProps('dimmed', { strokeWidth: 1.5 });
+  assert.equal(dimmed.primaryStyle.opacity, 0.16);
+  assert.equal(dimmed.haloStyle, undefined);
+
+  const idle = getFkEdgeVisualProps('idle', { strokeWidth: 1.5 });
+  assert.deepEqual(idle.primaryStyle, { strokeWidth: 1.5 });
+
+  const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(
+    css,
+    /\.dbml-fk-edge,\s*\.dbml-fk-edge-halo\s*\{[^}]*transition:[^}]*140ms/s,
+  );
+  assert.match(css, /\.react-flow__edge-text\s*\{[^}]*transition:[^}]*140ms/s);
 });

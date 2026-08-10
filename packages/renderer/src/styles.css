@@ -422,12 +422,23 @@
   pointer-events: none;
 }
 
+.dbml-fk-edge,
+.dbml-fk-edge-halo {
+  transition: stroke 140ms ease, stroke-width 140ms ease, opacity 140ms ease;
+}
+
+.dbml-fk-edge-halo {
+  pointer-events: none;
+}
+
 .react-flow__edge-text {
   fill: var(--dbml-muted);
+  transition: fill 140ms ease, opacity 140ms ease;
 }
 
 .react-flow__edge-textbg {
   fill: var(--dbml-surface);
+  transition: fill 140ms ease, opacity 140ms ease;
 }
 
 .react-flow__controls,
