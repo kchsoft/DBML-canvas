@@ -17,6 +17,7 @@ import com.intellij.util.Alarm
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -51,7 +52,18 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
 
     private fun createBrowserPanel(project: Project, disposable: com.intellij.openapi.Disposable): JPanel {
         val panel = JPanel(BorderLayout())
-        val browser = JBCefBrowser()
+        // On macOS, off-screen rendering routes trackpad scrolling through JetBrains Runtime's
+        // touch-scroll event types, which JBCefOsrComponent forwards to Chromium as touch
+        // events. Chromium then applies its touch gesture recognizer -- scroll slop plus fling
+        // physics -- so a two-finger pan stalls and then lurches. A windowed browser receives
+        // native scroll events instead and pans smoothly.
+        //
+        // Windowed mode means a heavyweight component, which paints above lightweight Swing
+        // popups and does not stream to remote clients, so keep off-screen rendering everywhere
+        // the panning problem has not been observed.
+        val browser = JBCefBrowser.createBuilder()
+            .setOffScreenRendering(!SystemInfo.isMac)
+            .build()
         val query = JBCefJSQuery.create(browser as JBCefBrowserBase)
         val handler = HostMessageHandler(project, browser, disposable)
 
