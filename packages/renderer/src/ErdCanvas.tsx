@@ -9,11 +9,19 @@ import {
   useEdgesState,
   useNodesState,
   type ColorMode,
+  type EdgeMouseHandler,
   type NodeMouseHandler,
   type OnNodeDrag,
   type OnMove,
 } from '@xyflow/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import {
   updateNodeLayout,
   updateNodeAnnotation,
@@ -26,6 +34,12 @@ import {
   type SourceRange,
 } from '@dbml-canvas/core';
 import { FkEdge } from './FkEdge.js';
+import {
+  deriveFkFocusPresentation,
+  transitionFkFocus,
+  type FkFocus,
+  type FkFocusPresentation,
+} from './fk-focus.js';
 import {
   createFlowEdges,
   createFlowNodes,
@@ -75,11 +89,20 @@ export function createInitialFlowState(
   layout: ErdLayout,
   onAnnotationChange?: TableAnnotationChangeHandler,
   onEditNote?: TableNoteEditHandler,
+  fkPresentation?: FkFocusPresentation,
+  onFkColumnFocus?: (columnId: string) => void,
 ) {
-  const nodes = createFlowNodes(schema, layout, onAnnotationChange, onEditNote);
+  const nodes = createFlowNodes(
+    schema,
+    layout,
+    onAnnotationChange,
+    onEditNote,
+    fkPresentation,
+    onFkColumnFocus,
+  );
   return {
     nodes,
-    edges: createFlowEdges(schema, nodes, 'settled'),
+    edges: createFlowEdges(schema, nodes, 'settled', fkPresentation),
   };
 }
 
@@ -104,6 +127,11 @@ function ErdCanvasInner({
   const canvasRef = useRef<HTMLDivElement>(null);
   const { getViewport, setViewport } = useReactFlow<TableFlowNode>();
   const latestLayout = useRef(layout);
+  const [fkFocus, setFkFocus] = useState<FkFocus>();
+  const fkPresentation = useMemo(
+    () => deriveFkFocusPresentation(schema, fkFocus),
+    [fkFocus, schema],
+  );
 
   const emitLayout = useCallback((next: ErdLayout) => {
     latestLayout.current = next;
@@ -118,34 +146,90 @@ function ErdCanvasInner({
     emitLayout(updateNodeAnnotation(latestLayout.current, tableId, position, patch));
   }, [emitLayout]);
 
+  const handleFkColumnFocus = useCallback((columnId: string) => {
+    setFkFocus((current) => transitionFkFocus(schema, current, {
+      type: 'column',
+      columnId,
+    }));
+  }, [schema]);
+
   const initialFlow = useMemo(
-    () => createInitialFlowState(schema, layout, handleAnnotationChange, onEditNote),
-    [handleAnnotationChange, layout, onEditNote, schema],
+    () => createInitialFlowState(
+      schema,
+      layout,
+      handleAnnotationChange,
+      onEditNote,
+      fkPresentation,
+      handleFkColumnFocus,
+    ),
+    [
+      fkPresentation,
+      handleAnnotationChange,
+      handleFkColumnFocus,
+      layout,
+      onEditNote,
+      schema,
+    ],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>(initialFlow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FkFlowEdge>(initialFlow.edges);
   const [routingMode, setRoutingMode] = useState<FkRoutingMode>('settled');
 
   useEffect(() => {
+    setFkFocus((current) => transitionFkFocus(schema, current, { type: 'schema' }));
+  }, [schema]);
+
+  useEffect(() => {
     latestLayout.current = layout;
     setNodes((current) => {
       const selectedIds = new Set(current.filter((node) => node.selected).map((node) => node.id));
-      return createFlowNodes(schema, layout, handleAnnotationChange, onEditNote).map((node) => ({
+      return createFlowNodes(
+        schema,
+        layout,
+        handleAnnotationChange,
+        onEditNote,
+        fkPresentation,
+        handleFkColumnFocus,
+      ).map((node) => ({
         ...node,
         ...(selectedIds.has(node.id) ? { selected: true } : {}),
       }));
     });
-  }, [handleAnnotationChange, layout, onEditNote, schema, setNodes]);
+  }, [
+    fkPresentation,
+    handleAnnotationChange,
+    handleFkColumnFocus,
+    layout,
+    onEditNote,
+    schema,
+    setNodes,
+  ]);
 
   useEffect(() => {
     setEdges((current) => {
       const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id));
-      return createFlowEdges(schema, nodes, routingMode).map((edge) => ({
+      return createFlowEdges(schema, nodes, routingMode, fkPresentation).map((edge) => ({
         ...edge,
         ...(selectedIds.has(edge.id) ? { selected: true } : {}),
       }));
     });
-  }, [nodes, routingMode, schema, setEdges]);
+  }, [fkPresentation, nodes, routingMode, schema, setEdges]);
+
+  const handleEdgeClick: EdgeMouseHandler<FkFlowEdge> = useCallback((event, edge) => {
+    event.stopPropagation();
+    setFkFocus((current) => transitionFkFocus(schema, current, {
+      type: 'edge',
+      relationshipId: edge.id,
+    }));
+  }, [schema]);
+
+  const clearFkFocus = useCallback(() => {
+    setFkFocus((current) => transitionFkFocus(schema, current, { type: 'clear' }));
+  }, [schema]);
+
+  const handleCanvasKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && !event.defaultPrevented) clearFkFocus();
+  }, [clearFkFocus]);
 
   const handleNodeDragStart: OnNodeDrag<TableFlowNode> = useCallback(() => {
     setRoutingMode((current) => transitionFkRoutingMode(current, 'drag-start'));
@@ -194,7 +278,11 @@ function ErdCanvasInner({
   }, [getViewport, setViewport]);
 
   return (
-    <div ref={canvasRef} className={className ? `dbml-canvas ${className}` : 'dbml-canvas'}>
+    <div
+      ref={canvasRef}
+      className={className ? `dbml-canvas ${className}` : 'dbml-canvas'}
+      onKeyDown={handleCanvasKeyDown}
+    >
       <ReactFlow<TableFlowNode, FkFlowEdge>
         colorMode={colorMode}
         nodes={nodes}
@@ -203,6 +291,8 @@ function ErdCanvasInner({
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgeClick={handleEdgeClick}
+        onPaneClick={clearFkFocus}
         onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onMoveEnd={handleMoveEnd}

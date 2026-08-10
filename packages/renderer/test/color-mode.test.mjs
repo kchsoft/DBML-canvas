@@ -67,6 +67,7 @@ test('creates the initial FK graph in settled routing mode', () => {
   });
 
   assert.equal(state.nodes.length, 2);
+  assert.equal(state.nodes[0].data.activeFkColumnId, undefined);
   assert.equal(state.edges.length, 1);
   assert.equal(state.edges[0].type, 'fk');
   assert.deepEqual(state.edges[0].data, {

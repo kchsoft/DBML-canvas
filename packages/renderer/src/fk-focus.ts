@@ -6,6 +6,12 @@ export type FkFocus =
 
 export type FkFocusState = 'idle' | 'focused' | 'dimmed';
 
+export type FkFocusEvent =
+  | { type: 'column'; columnId: string }
+  | { type: 'edge'; relationshipId: string }
+  | { type: 'clear' }
+  | { type: 'schema' };
+
 export interface FkFocusPresentation {
   relationshipIds: ReadonlySet<string>;
   endpointColumnIds: ReadonlySet<string>;
@@ -73,4 +79,21 @@ export function getFkEdgeFocusState(
 ): FkFocusState {
   if (presentation.relationshipIds.size === 0) return 'idle';
   return presentation.relationshipIds.has(relationshipId) ? 'focused' : 'dimmed';
+}
+
+export function transitionFkFocus(
+  schema: ErdSchema,
+  focus: FkFocus | undefined,
+  event: FkFocusEvent,
+): FkFocus | undefined {
+  switch (event.type) {
+    case 'column':
+      return createColumnFkFocus(schema, event.columnId);
+    case 'edge':
+      return createEdgeFkFocus(schema, event.relationshipId);
+    case 'schema':
+      return reconcileFkFocus(schema, focus);
+    case 'clear':
+      return undefined;
+  }
 }

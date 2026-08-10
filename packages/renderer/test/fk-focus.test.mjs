@@ -6,6 +6,7 @@ import {
   deriveFkFocusPresentation,
   getFkEdgeFocusState,
   reconcileFkFocus,
+  transitionFkFocus,
 } from '../dist/fk-focus.js';
 
 const relationship = (id, sourceColumns, targetTableId, targetColumns) => ({
@@ -123,4 +124,33 @@ test('keeps every edge idle when focus is absent', () => {
   assert.deepEqual([...presentation.relationshipIds], []);
   assert.deepEqual([...presentation.endpointColumnIds], []);
   assert.equal(getFkEdgeFocusState(presentation, 'orders-owner'), 'idle');
+});
+
+test('transitions column, edge, clear, and schema focus events', () => {
+  let focus = transitionFkFocus(schema, undefined, {
+    type: 'column',
+    columnId: 'public.orders.owner_id',
+  });
+  assert.deepEqual(focus?.relationshipIds, ['orders-owner', 'orders-approver']);
+
+  focus = transitionFkFocus(schema, focus, {
+    type: 'edge',
+    relationshipId: 'orders-owner',
+  });
+  assert.deepEqual(focus, {
+    kind: 'edge',
+    relationshipId: 'orders-owner',
+    relationshipIds: ['orders-owner'],
+  });
+
+  assert.equal(transitionFkFocus(schema, focus, { type: 'clear' }), undefined);
+
+  const schemaWithoutOwner = {
+    ...schema,
+    relationships: schema.relationships.filter(({ id }) => id !== 'orders-owner'),
+  };
+  assert.equal(
+    transitionFkFocus(schemaWithoutOwner, focus, { type: 'schema' }),
+    undefined,
+  );
 });
