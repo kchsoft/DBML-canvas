@@ -2,7 +2,9 @@
 
 Preview your `.dbml` schema as a draggable, Git-friendly ERD — right inside VS Code.
 
-![DBML Canvas table detail view](../../screen-capture/image1.png)
+![DBML Canvas ERD overview](https://raw.githubusercontent.com/kchsoft/DBML-canvas/main/screen-capture/image2.png)
+
+![DBML Canvas table detail view](https://raw.githubusercontent.com/kchsoft/DBML-canvas/main/screen-capture/image1.png)
 
 ## Features
 
