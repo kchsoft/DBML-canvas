@@ -19,6 +19,7 @@ Implemented:
 - CSS and JavaScript assets inlined into `loadHTML`, avoiding an external web server
 - JavaScript-to-Kotlin message bridge
 - Active DBML loading and editor-selection refresh
+- Debounced live refresh for IntelliJ editor changes and external file changes after a DBML is selected
 - `<schema>.dbml.layout.json` reading and writing
 - Double-click source navigation
 - Light/dark theme message

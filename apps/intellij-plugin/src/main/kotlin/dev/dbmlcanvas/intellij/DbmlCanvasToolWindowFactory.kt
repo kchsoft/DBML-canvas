@@ -16,9 +16,13 @@ import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.util.Alarm
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.CheckedDisposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
@@ -36,7 +40,7 @@ import javax.swing.JPanel
 class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = JPanel(BorderLayout())
-        val disposable = Disposer.newDisposable("DBML Canvas tool window")
+        val disposable = Disposer.newCheckedDisposable("DBML Canvas tool window")
 
         if (!JBCefApp.isSupported()) {
             panel.add(JLabel("DBML Canvas requires JCEF support in the running IDE."), BorderLayout.CENTER)
@@ -50,7 +54,7 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
         toolWindow.contentManager.addContent(content)
     }
 
-    private fun createBrowserPanel(project: Project, disposable: com.intellij.openapi.Disposable): JPanel {
+    private fun createBrowserPanel(project: Project, disposable: CheckedDisposable): JPanel {
         val panel = JPanel(BorderLayout())
         // On macOS, off-screen rendering routes trackpad scrolling through JetBrains Runtime's
         // touch-scroll event types, which JBCefOsrComponent forwards to Chromium as touch
@@ -105,6 +109,15 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
             disposable,
         )
 
+        project.messageBus.connect(disposable).subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: List<VFileEvent>) {
+                    handler.onVfsChanged(events)
+                }
+            },
+        )
+
         browser.loadHTML(html)
         panel.add(browser.component, BorderLayout.CENTER)
         return panel
@@ -148,7 +161,7 @@ class DbmlCanvasToolWindowFactory : ToolWindowFactory, DumbAware {
 private class HostMessageHandler(
     private val project: Project,
     private val browser: JBCefBrowser,
-    disposable: com.intellij.openapi.Disposable,
+    private val disposable: CheckedDisposable,
 ) {
     @Volatile
     private var webviewReady = false
@@ -157,14 +170,35 @@ private class HostMessageHandler(
     private var currentFile: VirtualFile? = null
 
     private val refreshAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, disposable)
+    private val refreshState = DbmlRefreshState()
 
     fun onDocumentChanged(document: Document) {
         val file = currentFile ?: return
         val changedFile = FileDocumentManager.getInstance().getFile(document) ?: return
         if (changedFile != file) return
 
+        scheduleRefresh(file)
+    }
+
+    fun onVfsChanged(events: List<VFileEvent>) {
+        val matchingEvent = events.asReversed()
+            .firstOrNull { event ->
+                event.file?.let { refreshState.matchesCurrentFile(it.url) } == true
+            }
+            ?: return
+        val changedFile = matchingEvent.file
+            ?.takeIf { it.isValid }
+            ?: return
+
+        scheduleRefresh(changedFile)
+    }
+
+    private fun scheduleRefresh(file: VirtualFile) {
         refreshAlarm.cancelAllRequests()
-        refreshAlarm.addRequest({ if (currentFile == file) refresh(file) }, 250)
+        refreshAlarm.addRequest(
+            { if (refreshState.matchesCurrentFile(file.url)) refresh(file) },
+            250,
+        )
     }
 
     fun handle(rawMessage: String) {
@@ -182,18 +216,25 @@ private class HostMessageHandler(
     }
 
     fun refresh(file: VirtualFile?) {
-        if (!webviewReady || file == null || !file.extension.equals("dbml", ignoreCase = true)) return
+        if (!webviewReady
+            || file == null
+            || !file.isValid
+            || !file.extension.equals("dbml", ignoreCase = true)
+        ) return
         currentFile = file
+        val refreshTicket = refreshState.beginRefresh(file.url)
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            val snapshot = ApplicationManager.getApplication().runReadAction<Pair<String, String>> {
+            val snapshot = ApplicationManager.getApplication().runReadAction<Pair<String, String>?> {
+                if (!file.isValid) return@runReadAction null
                 val document = FileDocumentManager.getInstance().getDocument(file)
                 if (document != null) {
                     document.text to document.modificationStamp.toString()
                 } else {
                     String(file.contentsToByteArray(), StandardCharsets.UTF_8) to file.modificationStamp.toString()
                 }
-            }
+            } ?: return@executeOnPooledThread
+            if (!file.isValid || !refreshState.isCurrent(refreshTicket)) return@executeOnPooledThread
             val layout = readLayout(file)
             val payload = JsonObject().apply {
                 addProperty("source", snapshot.first)
@@ -202,10 +243,10 @@ private class HostMessageHandler(
                 add("layout", layout)
                 addProperty("title", "ERD: ${file.name}")
             }
-            postMessage(JsonObject().apply {
+            postRefreshMessage(JsonObject().apply {
                 addProperty("type", "host/load")
                 add("payload", payload)
-            })
+            }, file, refreshTicket)
         }
     }
 
@@ -355,7 +396,22 @@ private class HostMessageHandler(
     private fun postMessage(message: JsonObject) {
         val javascript = "window.postMessage(${message}, '*');"
         ApplicationManager.getApplication().invokeLater {
+            if (disposable.isDisposed) return@invokeLater
             browser.cefBrowser.executeJavaScript(javascript, browser.cefBrowser.url, 0)
+        }
+    }
+
+    private fun postRefreshMessage(
+        message: JsonObject,
+        file: VirtualFile,
+        refreshTicket: DbmlRefreshState.Ticket,
+    ) {
+        val javascript = "window.postMessage(${message}, '*');"
+        ApplicationManager.getApplication().invokeLater {
+            if (disposable.isDisposed || !file.isValid) return@invokeLater
+            refreshState.runIfCurrent(refreshTicket) {
+                browser.cefBrowser.executeJavaScript(javascript, browser.cefBrowser.url, 0)
+            }
         }
     }
 

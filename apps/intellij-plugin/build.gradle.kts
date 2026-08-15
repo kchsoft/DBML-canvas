@@ -18,6 +18,8 @@ repositories {
 }
 
 dependencies {
+    testImplementation(kotlin("test"))
+
     intellijPlatform {
         intellijIdea(providers.gradleProperty("platformVersion")) {
             useInstaller = false
