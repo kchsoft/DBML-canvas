@@ -12,6 +12,7 @@ Preview your `.dbml` schema as a draggable, Git-friendly ERD — right inside VS
 - Drag tables to arrange your schema; positions are saved beside the file, not baked into the DBML
 - Click a column to see its type, constraints, indexes, and notes
 - Edit table and column `Note` values directly from the canvas, with native VS Code undo/redo
+- Keep an open ERD preview in sync when AI tools or other processes change its DBML file
 - DBML stays the single source of truth — the canvas never rewrites your schema structure
 
 ## Usage

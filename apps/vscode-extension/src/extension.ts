@@ -30,15 +30,18 @@ export function deactivate(): void {}
 class DbmlPreviewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private ready = false;
+  private disposed = false;
+  private refreshGeneration = 0;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly document: vscode.TextDocument,
+    private document: vscode.TextDocument,
   ) {}
 
   async open(): Promise<void> {
-    this.panel = vscode.window.createWebviewPanel(
+    const panel = vscode.window.createWebviewPanel(
       'dbmlCanvas.preview',
       `ERD: ${this.document.fileName.split(/[\\/]/).at(-1)}`,
       vscode.ViewColumn.Beside,
@@ -48,25 +51,46 @@ class DbmlPreviewPanel implements vscode.Disposable {
         localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')],
       },
     );
-
-    this.panel.webview.html = await getWebviewHtml(this.panel.webview, this.context.extensionUri);
+    this.panel = panel;
     this.disposables.push(
-      this.panel,
-      this.panel.webview.onDidReceiveMessage((message: WebviewToHostMessage) => this.handleMessage(message)),
+      panel,
+      panel.onDidDispose(() => this.dispose()),
+    );
+
+    const html = await getWebviewHtml(panel.webview, this.context.extensionUri);
+    if (this.disposed) return;
+    panel.webview.html = html;
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(this.document.uri, '*'),
+    );
+    const handleExternalChange = () => this.scheduleDocumentRefresh(true);
+    this.disposables.push(
+      panel.webview.onDidReceiveMessage((message: WebviewToHostMessage) => this.handleMessage(message)),
       vscode.workspace.onDidChangeTextDocument((event) => {
-        if (event.document.uri.toString() === this.document.uri.toString()) void this.sendDocument();
+        if (event.document.uri.toString() !== this.document.uri.toString()) return;
+        this.document = event.document;
+        this.scheduleDocumentRefresh(false);
       }),
+      watcher,
+      watcher.onDidChange(handleExternalChange),
+      watcher.onDidCreate(handleExternalChange),
     );
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.refreshGeneration += 1;
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = undefined;
     while (this.disposables.length > 0) this.disposables.pop()?.dispose();
   }
 
   private async handleMessage(message: WebviewToHostMessage): Promise<void> {
     if (message.type === 'webview/ready') {
       this.ready = true;
-      await this.sendDocument();
+      const generation = ++this.refreshGeneration;
+      await this.sendDocument(generation);
       await this.sendTheme();
       return;
     }
@@ -96,20 +120,51 @@ class DbmlPreviewPanel implements vscode.Disposable {
     }
   }
 
-  private async sendDocument(): Promise<void> {
-    if (!this.ready || !this.panel) return;
+  private scheduleDocumentRefresh(reloadFromDisk: boolean): void {
+    const generation = ++this.refreshGeneration;
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      void this.refreshDocument(generation, reloadFromDisk);
+    }, 250);
+  }
+
+  private async refreshDocument(generation: number, reloadFromDisk: boolean): Promise<void> {
+    try {
+      if (this.disposed || generation !== this.refreshGeneration) return;
+      if (reloadFromDisk) {
+        const document = await vscode.workspace.openTextDocument(this.document.uri);
+        if (this.disposed || generation !== this.refreshGeneration) return;
+        this.document = document;
+      }
+      await this.sendDocument(generation);
+    } catch (cause) {
+      if (!this.disposed && generation === this.refreshGeneration) {
+        await vscode.window.showErrorMessage(
+          `DBML Canvas: ${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      }
+    }
+  }
+
+  private async sendDocument(generation: number): Promise<void> {
+    if (this.disposed || !this.ready || !this.panel) return;
+    const document = this.document;
+    const source = document.getText();
+    const revision = String(document.version);
     const layout = await this.readLayout();
+    if (this.disposed || generation !== this.refreshGeneration || !this.panel) return;
     const payload: HostToWebviewMessage = {
       type: 'host/load',
       payload: {
-        source: this.document.getText(),
-        revision: String(this.document.version),
-        filepath: this.document.fileName,
+        source,
+        revision,
+        filepath: document.fileName,
         layout,
-        title: `ERD: ${this.document.fileName.split(/[\\/]/).at(-1)}`,
+        title: `ERD: ${document.fileName.split(/[\\/]/).at(-1)}`,
       },
     };
-    await this.panel.webview.postMessage(payload);
+    await this.postMessageIfActive(payload);
   }
 
   private async applyNoteEdit(message: WebviewEditNoteMessage): Promise<void> {
@@ -141,12 +196,12 @@ class DbmlPreviewPanel implements vscode.Disposable {
       const applied = await vscode.workspace.applyEdit(workspaceEdit);
       if (!applied) throw new Error('VS Code could not apply the DBML Note edit.');
 
-      await this.panel?.webview.postMessage({
+      await this.postMessageIfActive({
         type: 'host/edit-note-result',
         payload: { requestId, ok: true },
       } satisfies HostToWebviewMessage);
     } catch (cause) {
-      await this.panel?.webview.postMessage({
+      await this.postMessageIfActive({
         type: 'host/edit-note-result',
         payload: {
           requestId,
@@ -158,13 +213,18 @@ class DbmlPreviewPanel implements vscode.Disposable {
   }
 
   private async sendTheme(): Promise<void> {
-    if (!this.ready || !this.panel) return;
+    if (!this.ready) return;
     const dark = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark
       || vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.HighContrast;
-    await this.panel.webview.postMessage({
+    await this.postMessageIfActive({
       type: 'host/set-theme',
       payload: { theme: dark ? 'dark' : 'light' },
     } satisfies HostToWebviewMessage);
+  }
+
+  private async postMessageIfActive(message: HostToWebviewMessage): Promise<boolean> {
+    if (this.disposed || !this.panel) return false;
+    return this.panel.webview.postMessage(message);
   }
 
   private layoutUri(): vscode.Uri {
