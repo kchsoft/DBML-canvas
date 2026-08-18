@@ -75,6 +75,34 @@ test('FK routing snapshot changes only at drag boundaries', () => {
   assert.equal(measured.nodes, measuredNodes);
 });
 
+test('snapshot taken right after a drag ends carries the moved node ids for a targeted settle', () => {
+  const initialNodes = [node('public.orders'), node('public.users', 500)];
+  const settled = dragModule.updateFkRoutingSnapshot(undefined, initialNodes, undefined);
+  const session = dragModule.startFkDragSession(
+    initialNodes,
+    initialNodes[0],
+    [initialNodes[0]],
+  );
+  const started = dragModule.updateFkRoutingSnapshot(settled, initialNodes, session);
+  const movedNodes = [
+    { ...initialNodes[0], position: { x: 240, y: 40 } },
+    initialNodes[1],
+  ];
+  const stopped = dragModule.updateFkRoutingSnapshot(started, movedNodes, undefined);
+
+  assert.deepEqual([...stopped.settledMovedNodeIds], ['public.orders']);
+
+  const nextFrame = dragModule.updateFkRoutingSnapshot(stopped, movedNodes, undefined);
+  assert.equal(nextFrame, stopped);
+
+  const afterUnrelatedChange = dragModule.updateFkRoutingSnapshot(
+    settled,
+    [{ ...initialNodes[0], measured: { width: 340, height: 160 } }, initialNodes[1]],
+    undefined,
+  );
+  assert.equal(afterUnrelatedChange.settledMovedNodeIds, undefined);
+});
+
 test('FK drag session is cancelled when a moved table disappears', () => {
   assert.equal(typeof dragModule.reconcileFkDragSession, 'function');
 

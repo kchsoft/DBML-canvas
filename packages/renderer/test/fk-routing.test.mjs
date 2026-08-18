@@ -272,3 +272,55 @@ test('shares one routing snapshot and selectively replaces connected edges durin
   assert.equal(settledConnected.targetHandle, 'target:right:public.users.id');
   assert.equal(settledConnected.data.routingMode, 'settled');
 });
+
+test('settles only the edges connected to just-moved nodes after a drag ends, leaving unrelated edges untouched', () => {
+  const dragSchema = {
+    version: 1,
+    tables: [],
+    relationships: [
+      schema.relationships[0],
+      {
+        id: 'audit-team',
+        source: {
+          tableId: 'public.audit',
+          columnIds: ['public.audit.team_id'],
+          cardinality: '*',
+        },
+        target: {
+          tableId: 'public.teams',
+          columnIds: ['public.teams.id'],
+          cardinality: '1',
+        },
+      },
+    ],
+    warnings: [],
+  };
+  const initialNodes = [
+    node('public.orders', 0),
+    node('public.users', 500),
+    node('public.audit', 0),
+    node('public.teams', 500),
+  ];
+  const settledNodes = initialNodes.map((flowNode) => (
+    flowNode.id === 'public.orders'
+      ? { ...flowNode, position: { x: 900, y: 40 } }
+      : flowNode
+  ));
+  const current = createFlowEdges(dragSchema, initialNodes, 'adaptive');
+
+  const resettled = graph.updateFlowEdgesDuringDrag(
+    dragSchema,
+    settledNodes,
+    current,
+    new Set(['public.orders']),
+    undefined,
+    'settled',
+  );
+
+  const connected = resettled.find(({ id }) => id === 'orders-user');
+  const unrelated = resettled.find(({ id }) => id === 'audit-team');
+  assert.equal(connected.data.routingMode, 'settled');
+  assert.equal(connected.data.routingNodes, settledNodes);
+  assert.equal(unrelated, current[1]);
+  assert.equal(unrelated.data.routingMode, 'adaptive');
+});

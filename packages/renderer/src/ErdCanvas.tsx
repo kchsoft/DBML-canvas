@@ -277,6 +277,20 @@ function ErdCanvasInner({
         );
       }
 
+      // Right after a drag ends, only the just-moved tables' edges need a fresh
+      // A*-routed path; re-solving every relationship in the schema is the main
+      // cause of drag-stop jank on large diagrams.
+      if (fkRoutingSnapshot.settledMovedNodeIds) {
+        return updateFlowEdgesDuringDrag(
+          schema,
+          fkRoutingSnapshot.nodes,
+          current,
+          fkRoutingSnapshot.settledMovedNodeIds,
+          fkPresentation,
+          'settled',
+        );
+      }
+
       const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id));
       return createFlowEdges(schema, fkRoutingSnapshot.nodes, 'settled', fkPresentation).map((edge) => ({
         ...edge,

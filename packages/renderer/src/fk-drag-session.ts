@@ -13,6 +13,7 @@ export interface FkDragSession {
 export interface FkRoutingSnapshot {
   nodes: TableFlowNode[];
   dragSession?: FkDragSession;
+  settledMovedNodeIds?: ReadonlySet<string>;
 }
 
 function areFkRoutingNodesEqual(left: TableFlowNode[], right: TableFlowNode[]): boolean {
@@ -56,6 +57,10 @@ export function updateFkRoutingSnapshot(
 
   if (!current?.dragSession && current && areFkRoutingNodesEqual(current.nodes, nodes)) {
     return current;
+  }
+
+  if (current?.dragSession) {
+    return { nodes, settledMovedNodeIds: current.dragSession.movedNodeIds };
   }
 
   return { nodes };

@@ -213,6 +213,7 @@ export function updateFlowEdgesDuringDrag(
   currentEdges: FkFlowEdge[],
   movedNodeIds: ReadonlySet<string>,
   fkPresentation?: FkFocusPresentation,
+  routingMode: FkRoutingMode = 'adaptive',
 ): FkFlowEdge[] {
   const connectedRelationships = schema.relationships.filter((relationship) => (
     movedNodeIds.has(relationship.source.tableId)
@@ -222,7 +223,7 @@ export function updateFlowEdgesDuringDrag(
     createFlowEdges(
       { ...schema, relationships: connectedRelationships },
       nodes,
-      'adaptive',
+      routingMode,
       fkPresentation,
     ).map((edge) => [edge.id, edge]),
   );
