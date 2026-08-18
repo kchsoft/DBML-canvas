@@ -25,12 +25,12 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.ui.JBColor
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
-import com.intellij.util.ui.UIUtil
 import com.intellij.psi.PsiDocumentManager
 import java.awt.BorderLayout
 import java.nio.charset.StandardCharsets
@@ -331,7 +331,7 @@ private class HostMessageHandler(
         postMessage(JsonObject().apply {
             addProperty("type", "host/set-theme")
             add("payload", JsonObject().apply {
-                addProperty("theme", if (UIUtil.isUnderDarcula()) "dark" else "light")
+                addProperty("theme", if (JBColor.isBright()) "light" else "dark")
             })
         })
     }
