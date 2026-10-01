@@ -4,7 +4,7 @@
 
 # DBML Canvas
 
-**Git 친화적이고 AI가 읽을 수 있는 DBML 기반 ERD 워크플로우 — 브라우저, VS Code, JetBrains IDE에서.**
+**Git 친화적이고 AI가 읽을 수 있는 DBML 기반 ERD 플러그인 — 브라우저, VS Code, JetBrains IDE에서.**
 
 [English](README.md) | 한국어
 
