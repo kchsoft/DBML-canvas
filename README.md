@@ -4,7 +4,7 @@
 
 # DBML Canvas
 
-**A Git-native, AI-readable ERD workflow for DBML — in your browser, VS Code, and JetBrains IDEs.**
+**A Git-native, AI-readable ERD plugin for DBML — in your browser, VS Code, and JetBrains IDEs.**
 
 English | [한국어](README.ko.md)
 
